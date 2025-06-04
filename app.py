@@ -12,7 +12,7 @@ def obter_localizacao():
     <div style="padding: 15px; border: 2px solid #0066cc; border-radius: 10px; margin: 15px 0; background: linear-gradient(135deg, #f5f7fa 0%, #c3cfe2 100%);">
         <h4 style="margin-top: 0; color: #0066cc;">📍 Obter Localização de Alta Precisão</h4>
         
-        <div style="margin-bottom: 15px;">
+        <div style="margin-bottom: 15px; display: flex; flex-wrap: wrap; gap: 10px; justify-content: center;">
             <button onclick="getHighPrecisionLocation()" style="
                 background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); 
                 color: white; 
@@ -20,9 +20,11 @@ def obter_localizacao():
                 padding: 12px 20px; 
                 border-radius: 8px; 
                 cursor: pointer;
-                margin-right: 10px;
                 font-size: 14px;
                 box-shadow: 0 4px 15px 0 rgba(31, 38, 135, 0.37);
+                flex: 1 1 auto; /* Responsividade */
+                min-width: 180px; /* Largura mínima */
+                text-align: center;
             " onmouseover="this.style.transform='scale(1.05)'" onmouseout="this.style.transform='scale(1)'">
                 🎯 Localização de Alta Precisão
             </button>
@@ -34,9 +36,11 @@ def obter_localizacao():
                 padding: 12px 20px; 
                 border-radius: 8px; 
                 cursor: pointer;
-                margin-right: 10px;
                 font-size: 14px;
                 box-shadow: 0 4px 15px 0 rgba(76, 175, 80, 0.37);
+                flex: 1 1 auto; /* Responsividade */
+                min-width: 180px; /* Largura mínima */
+                text-align: center;
             " onmouseover="this.style.transform='scale(1.05)'" onmouseout="this.style.transform='scale(1)'">
                 ⚡ Localização Rápida
             </button>
@@ -50,6 +54,9 @@ def obter_localizacao():
                 cursor: pointer;
                 font-size: 14px;
                 box-shadow: 0 4px 15px 0 rgba(245, 87, 108, 0.37);
+                flex: 1 1 auto; /* Responsividade */
+                min-width: 120px; /* Largura mínima para botão menor */
+                text-align: center;
             " onmouseover="this.style.transform='scale(1.05)'" onmouseout="this.style.transform='scale(1)'">
                 🗑️ Limpar
             </button>
@@ -58,12 +65,7 @@ def obter_localizacao():
         <div id="status" style="margin-top: 15px; font-weight: bold; font-size: 14px;"></div>
         <div id="coordinates" style="margin-top: 15px; display: none;"></div>
         
-        <div style="margin-top: 10px; font-size: 12px; color: #666; line-height: 1.4;">
-            🎯 <strong>Alta Precisão:</strong> Aguarda múltiplas leituras GPS (mais preciso)<br>
-            ⚡ <strong>Rápida:</strong> Primeira leitura GPS disponível (mais rápido)<br>
-            💡 <strong>Dica:</strong> Para melhor precisão, fique ao ar livre com visão clara do céu
         </div>
-    </div>
 
     <script>
     let currentCoords = null;
@@ -195,7 +197,6 @@ def obter_localizacao():
         status.innerHTML = `✅ Localização obtida! Precisão: ${precisionLevel}`;
         status.style.color = precisionColor;
         
-        // Layout responsivo e simplificado
         coordinates.innerHTML = `
             <div style="
                 background: rgba(255,255,255,0.95); 
@@ -262,7 +263,6 @@ def obter_localizacao():
         
         coordinates.style.display = "block";
         
-        // Armazenar no sessionStorage
         sessionStorage.setItem('gps_coords', currentCoords.formatted);
         sessionStorage.setItem('gps_accuracy', accuracy.toString());
         sessionStorage.setItem('gps_timestamp', timestamp.toISOString());
@@ -302,7 +302,6 @@ def obter_localizacao():
     function copyCoords() {
         if (currentCoords) {
             navigator.clipboard.writeText(currentCoords.formatted).then(function() {
-                // Feedback visual melhorado
                 const button = event.target;
                 const originalText = button.innerHTML;
                 button.innerHTML = "✅ Copiado!";
@@ -343,11 +342,10 @@ def obter_localizacao():
     </script>
     """
     
-    components.html(html_code, height=350)
+    components.html(html_code, height=350) # A altura pode precisar de ajuste dependendo do conteúdo final
 
 def criar_botao_preencher_coords(campo_nome):
     """Criar botão para preencher coordenadas automaticamente"""
-    # Escapar chaves para JavaScript, pois esta é uma f-string Python
     button_html = f"""
     <button 
         onclick="preencherCampo()" 
@@ -408,10 +406,8 @@ def criar_botao_preencher_coords(campo_nome):
 
 def criar_botao_copiar(texto):
     """Criar botão customizado para copiar texto"""
-    # Escapar o texto fora da f-string
     texto_escapado = texto.replace('`', '\\`').replace('"', '\\"').replace("'", "\\'")
     
-    # Escapar chaves para JavaScript, pois esta é uma f-string Python
     button_html = f"""
     <div style="margin: 10px 0;">
         <button 
@@ -487,16 +483,13 @@ def refinar_texto_com_openai(texto):
 def gerar_historico(dados):
     """Função para gerar o histórico baseado no template"""
     
-    # Template base
     template = f"""Em atendimento à Ordem de Serviço, vinculada ao Programa de Segurança Rural no Vale do Jamari, foi realizada uma visita técnica em {dados['data']}, com início às {dados['hora_inicio']} e término às {dados['hora_fim']}. A diligência ocorreu na propriedade rural denominada {dados['tipo_propriedade']} "{dados['nome_propriedade']}", situada em {dados['endereco']}, na Zona Rural do município de {dados['municipio']}/{dados['uf']}. Procedeu-se ao levantamento das coordenadas geográficas, sendo a porteira de acesso principal localizada em {dados['lat_long_porteira']}, e a sede/residência principal em {dados['lat_long_sede']}. A área total da propriedade compreende {dados['area']} {dados['unidade_area']}. O proprietário, Sr. "{dados['nome_proprietario']}", inscrito no CPF/CNPJ sob o nº "{dados['cpf_cnpj']}", com contato telefônico principal "{dados['telefone']}", esteve presente durante a visita. A principal atividade econômica desenvolvida no local é "{dados['atividade_principal']}"."""
     
-    # Adicionar informação sobre veículos apenas se houver
     if dados['veiculos']:
         template += f" Foram identificados os seguintes veículos automotores na propriedade: {dados['veiculos']}."
     
-    # Adicionar informação sobre rebanho apenas se houver marca de gado
     if dados['marca_gado']:
-        template += f" O rebanho possui marca/sinal/ferro registrado como \"{dados['marca_gado']}\"." # Aspas escapadas corretamente
+        template += f" O rebanho possui marca/sinal/ferro registrado como \"{dados['marca_gado']}\"."
     
     template += f""" A visita teve como objetivo central o cadastro e georreferenciamento da propriedade no sistema do Programa de Segurança Rural, o que foi efetivado. Consequentemente, foi afixada a placa de identificação do programa, de nº "{dados['numero_placa']}", entregue via mídia digital. Adicionalmente, foram repassadas ao proprietário orientações concernentes ao programa mencionado, a fim de sanar as dúvidas existentes. A presente visita cumpriu os objetivos estabelecidos pela referida Ordem de Serviço, sendo as informações coletadas e registradas com base nas declarações do proprietário e na verificação in loco."""
     
@@ -512,31 +505,28 @@ def main():
     st.title("🚔 Gerador de Histórico Policial")
     st.subheader("Programa de Segurança Rural - Vale do Jamari")
     
-    # Verificar se a API Key está configurada
     if "OPENAI_API_KEY" not in st.secrets:
         st.error("⚠️ API Key da OpenAI não configurada! Configure no arquivo .streamlit/secrets.toml")
         st.stop()
     
-    # Sidebar com instruções
     with st.sidebar:
         st.header("📋 Instruções")
-        st.write("1. **📍 Localização**: Use o botão '🎯 Alta Precisão' para obter coordenadas GPS automaticamente")
-        st.write("2. Preencha todos os campos obrigatórios")
-        st.write("3. Campos opcionais: veículos e marca de gado")
-        st.write("4. Clique em 'Gerar Histórico'")
-        st.write("5. O texto será refinado automaticamente")
-        st.write("6. Use o botão 'Copiar' para usar o texto")
+        st.write("1. **📍 Localização**: Use os botões '🎯 Alta Precisão' ou '⚡ Rápida' para obter coordenadas GPS.")
+        st.write("2. Preencha todos os campos obrigatórios.")
+        st.write("3. Campos opcionais: veículos e marca de gado.")
+        st.write("4. Clique em '🚀 Gerar Histórico'.")
+        st.write("5. O texto será refinado automaticamente pela IA.")
+        st.write("6. Use o botão '📋 Copiar Texto Completo' ou '💾 Baixar como TXT'.")
         
         st.header("🔧 Dicas de Precisão GPS")
-        st.write("🎯 **Alta Precisão**: Aguarda múltiplas leituras GPS (1-5 metros)")
-        st.write("⚡ **Rápida**: Primeira leitura disponível (pode ser menos precisa)")
-        st.write("📱 **No celular**: Permita acesso à localização quando solicitado")
-        st.write("🌍 **GPS**: Funcione melhor ao ar livre com visão do céu")
-        st.write("⏰ **Paciência**: Alta precisão pode levar até 60 segundos")
-        st.write("📍 **Posição**: Mantenha o dispositivo parado durante a captura")
-        st.write("🔒 **HTTPS**: Funciona apenas em conexões seguras")
+        # st.write("🎯 **Alta Precisão**: Aguarda múltiplas leituras GPS (1-5 metros)") # Removido conforme solicitado, mas pode ser útil manter aqui se o espaço não for problema
+        # st.write("⚡ **Rápida**: Primeira leitura disponível (pode ser menos precisa)") # Removido
+        st.write("📱 **No celular**: Permita acesso à localização quando solicitado pelo navegador.")
+        st.write("🌍 **GPS**: Funciona melhor ao ar livre com visão clara do céu.")
+        st.write("⏰ **Paciência**: A 'Alta Precisão' pode levar até 60 segundos.")
+        st.write("📍 **Posição**: Mantenha o dispositivo relativamente parado durante a captura para melhor precisão.")
+        st.write("🔒 **HTTPS**: A geolocalização do navegador geralmente requer conexão segura (HTTPS).")
     
-    # Formulário principal
     with st.form("formulario_historico"):
         col1, col2 = st.columns(2)
         
@@ -555,19 +545,13 @@ def main():
             
         with col2:
             st.header("📍 Coordenadas GPS")
-            
-            # Widget de geolocalização
             obter_localizacao()
             
             lat_long_porteira = st.text_input("Coordenadas da porteira (Lat, Long)", placeholder="Ex: -9.897289, -63.017788")
-            # Exemplo de como o botão de preenchimento poderia ser usado, se desejado:
-            # criar_botao_preencher_coords("porteira") 
-            
             lat_long_sede = st.text_input("Coordenadas da sede (Lat, Long)", placeholder="Ex: -9.897500, -63.017900")
-            # criar_botao_preencher_coords("sede")
             
             st.header("📏 Área e Proprietário")
-            area = st.number_input("Área da propriedade", min_value=0.0, step=0.1)
+            area = st.number_input("Área da propriedade", min_value=0.01, step=0.1, format="%.2f") # Min value 0.01
             unidade_area = st.selectbox("Unidade", ["hectares", "alqueires"])
             nome_proprietario = st.text_input("Nome do proprietário")
             cpf_cnpj = st.text_input("CPF/CNPJ", placeholder="000.000.000-00 ou 00.000.000/0000-00")
@@ -587,23 +571,33 @@ def main():
         st.header("🏷️ Placa de Identificação")
         numero_placa = st.text_input("Número da placa", placeholder="Ex: PSR-001")
         
-        # Botão de submissão
         submitted = st.form_submit_button("🚀 Gerar Histórico", use_container_width=True)
     
-    # Processar fora do formulário
     if submitted:
-        # Validar campos obrigatórios
-        campos_obrigatorios = [
-            data, hora_inicio, hora_fim, nome_propriedade, endereco,
-            municipio, lat_long_porteira, lat_long_sede,
-            area, nome_proprietario, cpf_cnpj, telefone, atividade_principal,
-            numero_placa
-        ]
+        campos_obrigatorios = {
+            "Data da visita": data,
+            "Hora de início": hora_inicio,
+            "Hora de término": hora_fim,
+            "Nome da propriedade": nome_propriedade,
+            "Endereço completo": endereco,
+            "Município": municipio,
+            "Coordenadas da porteira": lat_long_porteira,
+            "Coordenadas da sede": lat_long_sede,
+            "Área da propriedade": area,
+            "Nome do proprietário": nome_proprietario,
+            "CPF/CNPJ": cpf_cnpj,
+            "Telefone": telefone,
+            "Atividade principal": atividade_principal,
+            "Número da placa": numero_placa
+        }
         
-        if not all(campos_obrigatorios) or area <= 0: # Adicionada validação para área > 0
-            st.error("❌ Por favor, preencha todos os campos obrigatórios! A área deve ser maior que zero.")
+        campos_vazios = [nome for nome, valor in campos_obrigatorios.items() if not valor]
+        
+        if campos_vazios:
+            st.error(f"❌ Por favor, preencha todos os campos obrigatórios: {', '.join(campos_vazios)}!")
+        elif area <= 0:
+             st.error("❌ A área da propriedade deve ser maior que zero.")
         else:
-            # Preparar dados
             dados = {
                 'data': data.strftime("%d/%m/%Y"),
                 'hora_inicio': hora_inicio.strftime("%H:%M"),
@@ -611,11 +605,11 @@ def main():
                 'tipo_propriedade': tipo_propriedade,
                 'nome_propriedade': nome_propriedade,
                 'endereco': endereco,
-                'municipio': municipio, # Indentação corrigida
+                'municipio': municipio,
                 'uf': uf,
                 'lat_long_porteira': lat_long_porteira,
                 'lat_long_sede': lat_long_sede,
-                'area': str(area),
+                'area': f"{area:.2f}", # Formatar área com 2 casas decimais
                 'unidade_area': unidade_area,
                 'nome_proprietario': nome_proprietario,
                 'cpf_cnpj': cpf_cnpj,
@@ -626,37 +620,27 @@ def main():
                 'numero_placa': numero_placa
             }
            
-            # Gerar histórico
             with st.spinner("🔄 Gerando histórico..."):
                 historico_bruto = gerar_historico(dados)
            
-            # Refinar com OpenAI
             with st.spinner("✨ Refinando texto com IA..."):
                 historico_refinado = refinar_texto_com_openai(historico_bruto)
            
-            # Exibir resultado
             st.success("✅ Histórico gerado com sucesso!")
            
             st.header("📄 Histórico Final")
-           
-            # Área de texto para visualização
-            # Usando st.markdown para permitir melhor formatação e quebra de linhas do texto.
-            # Para visualização direta, st.text_area(disabled=True) é bom, mas markdown pode ser mais rico.
             st.text_area("Texto gerado:", value=historico_refinado, height=400, key="historico_final_text_area", disabled=True)
                        
-            # Colunas para os botões
             col_copy, col_download = st.columns(2)
            
             with col_copy:
-                # Botão personalizado para copiar
                 criar_botao_copiar(historico_refinado)
            
             with col_download:
-                # Botão de download
                 st.download_button(
                     label="💾 Baixar como TXT",
                     data=historico_refinado,
-                    file_name=f"historico_policial_{data.strftime('%Y%m%d')}_{nome_propriedade.replace(' ','_')}.txt", # Nome de arquivo mais descritivo
+                    file_name=f"historico_policial_{data.strftime('%Y%m%d')}_{nome_propriedade.replace(' ','_')}.txt",
                     mime="text/plain",
                     use_container_width=True
                 )
