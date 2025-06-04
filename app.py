@@ -56,12 +56,12 @@ def obter_localizacao():
         </div>
         
         <div id="status" style="margin-top: 15px; font-weight: bold; font-size: 14px;"></div>
-        <div id="coordinates" style="margin-top: 15px; font-family: 'Courier New', monospace; background: rgba(255,255,255,0.8); padding: 15px; border-radius: 8px; display: none; border-left: 4px solid #28a745;"></div>
+        <div id="coordinates" style="margin-top: 15px; display: none;"></div>
         
-        <div style="margin-top: 10px; font-size: 12px; color: #666;">
-            🎯 <strong>Alta Precisão:</strong> Aguarda múltiplas leituras GPS (mais lento, mais preciso)<br>
-            ⚡ <strong>Rápida:</strong> Primeira leitura GPS disponível (mais rápido, menos preciso)<br>
-            💡 <strong>Dica:</strong> Certifique-se de estar ao ar livre com visão clara do céu
+        <div style="margin-top: 10px; font-size: 12px; color: #666; line-height: 1.4;">
+            🎯 <strong>Alta Precisão:</strong> Aguarda múltiplas leituras GPS (mais preciso)<br>
+            ⚡ <strong>Rápida:</strong> Primeira leitura GPS disponível (mais rápido)<br>
+            💡 <strong>Dica:</strong> Para melhor precisão, fique ao ar livre com visão clara do céu
         </div>
     </div>
 
@@ -87,7 +87,7 @@ def obter_localizacao():
         attempts = 0;
         currentCoords = null;
         
-        status.innerHTML = "🎯 Iniciando localização de alta precisão... Aguarde até 60 segundos para melhor resultado.";
+        status.innerHTML = "🎯 Iniciando localização de alta precisão... Aguarde até 60 segundos.";
         status.style.color = "#007bff";
         coordinates.style.display = "none";
         
@@ -97,7 +97,7 @@ def obter_localizacao():
                 attempts++;
                 const accuracy = position.coords.accuracy;
                 
-                status.innerHTML = `🔄 Tentativa ${attempts}/${maxAttempts} - Precisão atual: ±${Math.round(accuracy)}m - Melhorando...`;
+                status.innerHTML = `🔄 Tentativa ${attempts}/${maxAttempts} - Precisão: ±${Math.round(accuracy)}m`;
                 
                 // Aceitar se a precisão melhorou significativamente ou é boa o suficiente
                 if (accuracy < bestAccuracy && (accuracy < 10 || attempts >= maxAttempts)) {
@@ -105,19 +105,15 @@ def obter_localizacao():
                     processPosition(position, true);
                     navigator.geolocation.clearWatch(watchId);
                 } else if (attempts >= maxAttempts) {
-                    // Usar a melhor posição encontrada
                     processPosition(position, true);
                     navigator.geolocation.clearWatch(watchId);
                 }
             },
-            function(error) {
-                navigator.geolocation.clearWatch(watchId);
-                handleLocationError(error);
-            },
+            handleLocationError,
             {
                 enableHighAccuracy: true,
-                timeout: 60000,  // 60 segundos
-                maximumAge: 0    // Sempre nova leitura
+                timeout: 60000,
+                maximumAge: 0
             }
         );
         
@@ -126,9 +122,9 @@ def obter_localizacao():
             if (watchId) {
                 navigator.geolocation.clearWatch(watchId);
                 if (currentCoords) {
-                    status.innerHTML = "⏰ Tempo limite atingido. Usando melhor localização encontrada.";
+                    status.innerHTML = "⏰ Tempo limite. Usando melhor localização encontrada.";
                 } else {
-                    status.innerHTML = "⏰ Tempo limite atingido. Tente novamente em área aberta.";
+                    status.innerHTML = "⏰ Tempo limite. Tente em área mais aberta.";
                     status.style.color = "#ff9800";
                 }
             }
@@ -151,13 +147,11 @@ def obter_localizacao():
             function(position) {
                 processPosition(position, false);
             },
-            function(error) {
-                handleLocationError(error);
-            },
+            handleLocationError,
             {
                 enableHighAccuracy: true,
                 timeout: 10000,
-                maximumAge: 30000  // Aceita cache de 30 segundos
+                maximumAge: 30000
             }
         );
     }
@@ -170,8 +164,6 @@ def obter_localizacao():
         const lng = position.coords.longitude;
         const accuracy = position.coords.accuracy;
         const timestamp = new Date(position.timestamp);
-        const altitude = position.coords.altitude;
-        const speed = position.coords.speed;
         
         currentCoords = {
             lat: lat.toFixed(8),
@@ -200,53 +192,74 @@ def obter_localizacao():
             precisionColor = "#dc3545";
         }
         
-        status.innerHTML = `✅ Localização obtida com sucesso! Precisão: ${precisionLevel}`;
+        status.innerHTML = `✅ Localização obtida! Precisão: ${precisionLevel}`;
         status.style.color = precisionColor;
         
-        let additionalInfo = "";
-        if (altitude !== null) {
-            additionalInfo += `<strong>Altitude:</strong> ${Math.round(altitude)}m<br>`;
-        }
-        if (speed !== null && speed > 0) {
-            additionalInfo += `<strong>Velocidade:</strong> ${Math.round(speed * 3.6)} km/h<br>`;
-        }
-        
+        // Layout responsivo e simplificado
         coordinates.innerHTML = `
-            <strong>📍 Coordenadas ${isHighPrecision ? 'de Alta Precisão' : 'Rápidas'}:</strong><br>
-            <strong>Latitude:</strong> ${lat.toFixed(8)}<br>
-            <strong>Longitude:</strong> ${lng.toFixed(8)}<br>
-            <strong>Precisão:</strong> ±${Math.round(accuracy)} metros <span style="color: ${precisionColor}; font-weight: bold;">(${precisionLevel})</span><br>
-            ${additionalInfo}
-            <strong>Horário:</strong> ${timestamp.toLocaleTimeString()}<br><br>
-            <strong>🔗 Formato para usar:</strong><br>
-            <span style="background: #e9ecef; padding: 5px; border-radius: 4px; font-weight: bold;">${lat.toFixed(8)}, ${lng.toFixed(8)}</span><br><br>
-            <button onclick="copyCoords()" style="
-                background: #28a745; 
-                color: white; 
-                border: none; 
-                padding: 8px 15px; 
-                border-radius: 5px; 
-                cursor: pointer;
-                margin-right: 10px;
-            ">📋 Copiar Coordenadas</button>
-            <button onclick="fillFields()" style="
-                background: #17a2b8; 
-                color: white; 
-                border: none; 
-                padding: 8px 15px; 
-                border-radius: 5px; 
-                cursor: pointer;
-            ">📝 Preencher Campos</button>
-            <button onclick="openMaps()" style="
-                background: #6f42c1; 
-                color: white; 
-                border: none; 
-                padding: 8px 15px; 
-                border-radius: 5px; 
-                cursor: pointer;
-                margin-left: 10px;
-            ">🗺️ Ver no Mapa</button>
+            <div style="
+                background: rgba(255,255,255,0.95); 
+                padding: 20px; 
+                border-radius: 12px; 
+                border-left: 5px solid ${precisionColor};
+                box-shadow: 0 4px 12px rgba(0,0,0,0.1);
+                margin-top: 15px;
+            ">
+                <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 15px; margin-bottom: 20px;">
+                    <div>
+                        <div style="font-size: 12px; color: #666; margin-bottom: 5px;">📍 LATITUDE</div>
+                        <div style="font-family: 'Courier New', monospace; font-size: 16px; font-weight: bold; color: #333;">${lat.toFixed(8)}</div>
+                    </div>
+                    <div>
+                        <div style="font-size: 12px; color: #666; margin-bottom: 5px;">📍 LONGITUDE</div>
+                        <div style="font-family: 'Courier New', monospace; font-size: 16px; font-weight: bold; color: #333;">${lng.toFixed(8)}</div>
+                    </div>
+                </div>
+                
+                <div style="margin-bottom: 20px;">
+                    <div style="font-size: 12px; color: #666; margin-bottom: 5px;">🎯 PRECISÃO</div>
+                    <div style="font-size: 16px; font-weight: bold; color: ${precisionColor};">±${Math.round(accuracy)} metros (${precisionLevel})</div>
+                </div>
+                
+                <div style="background: #f8f9fa; padding: 12px; border-radius: 8px; margin-bottom: 20px;">
+                    <div style="font-size: 12px; color: #666; margin-bottom: 5px;">📋 FORMATO PARA COPIAR</div>
+                    <div style="font-family: 'Courier New', monospace; font-size: 14px; font-weight: bold; color: #007bff; word-break: break-all;">${lat.toFixed(8)}, ${lng.toFixed(8)}</div>
+                </div>
+                
+                <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px;">
+                    <button onclick="copyCoords()" style="
+                        background: linear-gradient(135deg, #28a745 0%, #20c997 100%);
+                        color: white;
+                        border: none;
+                        padding: 12px 16px;
+                        border-radius: 8px;
+                        cursor: pointer;
+                        font-size: 14px;
+                        font-weight: bold;
+                        box-shadow: 0 4px 12px rgba(40, 167, 69, 0.3);
+                        transition: all 0.3s;
+                    " onmouseover="this.style.transform='translateY(-2px)'" onmouseout="this.style.transform='translateY(0)'">
+                        📋 Copiar Coordenadas
+                    </button>
+                    
+                    <button onclick="openMaps()" style="
+                        background: linear-gradient(135deg, #6f42c1 0%, #e83e8c 100%);
+                        color: white;
+                        border: none;
+                        padding: 12px 16px;
+                        border-radius: 8px;
+                        cursor: pointer;
+                        font-size: 14px;
+                        font-weight: bold;
+                        box-shadow: 0 4px 12px rgba(111, 66, 193, 0.3);
+                        transition: all 0.3s;
+                    " onmouseover="this.style.transform='translateY(-2px)'" onmouseout="this.style.transform='translateY(0)'">
+                        🗺️ Ver no Mapa
+                    </button>
+                </div>
+            </div>
         `;
+        
         coordinates.style.display = "block";
         
         // Armazenar no sessionStorage
@@ -264,24 +277,24 @@ def obter_localizacao():
         
         switch(error.code) {
             case error.PERMISSION_DENIED:
-                errorMsg = "❌ Acesso à localização foi negado.";
-                suggestions = "💡 Permita o acesso nas configurações do navegador ou recarregue a página.";
+                errorMsg = "❌ Acesso à localização negado.";
+                suggestions = "💡 Permita acesso nas configurações do navegador.";
                 break;
             case error.POSITION_UNAVAILABLE:
                 errorMsg = "❌ Localização não disponível.";
-                suggestions = "💡 Verifique se o GPS está ativado e tente em área aberta.";
+                suggestions = "💡 Verifique se GPS está ativo e tente ao ar livre.";
                 break;
             case error.TIMEOUT:
                 errorMsg = "❌ Tempo limite excedido.";
-                suggestions = "💡 Tente a opção 'Localização Rápida' ou mova-se para área com melhor sinal GPS.";
+                suggestions = "💡 Tente localização rápida ou mova para área aberta.";
                 break;
             default:
-                errorMsg = "❌ Erro desconhecido ao obter localização.";
+                errorMsg = "❌ Erro desconhecido.";
                 suggestions = "💡 Recarregue a página e tente novamente.";
                 break;
         }
         
-        status.innerHTML = errorMsg + "<br>" + suggestions;
+        status.innerHTML = errorMsg + "<br><span style='font-size: 12px;'>" + suggestions + "</span>";
         status.style.color = "#dc3545";
         coordinates.style.display = "none";
     }
@@ -289,19 +302,20 @@ def obter_localizacao():
     function copyCoords() {
         if (currentCoords) {
             navigator.clipboard.writeText(currentCoords.formatted).then(function() {
-                alert('📋 Coordenadas copiadas: ' + currentCoords.formatted + '\\nPrecisão: ±' + Math.round(currentCoords.accuracy) + 'm');
+                // Feedback visual melhorado
+                const button = event.target;
+                const originalText = button.innerHTML;
+                button.innerHTML = "✅ Copiado!";
+                button.style.background = "linear-gradient(135deg, #17a2b8 0%, #138496 100%)";
+                
+                setTimeout(() => {
+                    button.innerHTML = originalText;
+                    button.style.background = "linear-gradient(135deg, #28a745 0%, #20c997 100%)";
+                }, 2000);
+                
             }).catch(function() {
                 prompt('Copie as coordenadas:', currentCoords.formatted);
             });
-        }
-    }
-    
-    function fillFields() {
-        if (currentCoords) {
-            setTimeout(() => {
-                sessionStorage.setItem('fill_coords_request', currentCoords.formatted);
-                alert('📝 Coordenadas prontas para uso!\\nPrecisão: ±' + Math.round(currentCoords.accuracy) + 'm\\n\\nUse os botões azuis abaixo dos campos para preencher automaticamente.');
-            }, 100);
         }
     }
     
@@ -325,15 +339,15 @@ def obter_localizacao():
         sessionStorage.removeItem('gps_coords');
         sessionStorage.removeItem('gps_accuracy');
         sessionStorage.removeItem('gps_timestamp');
-        sessionStorage.removeItem('fill_coords_request');
     }
     </script>
     """
     
-    components.html(html_code, height=320)
+    components.html(html_code, height=350)
 
 def criar_botao_preencher_coords(campo_nome):
     """Criar botão para preencher coordenadas automaticamente"""
+    # Escapar chaves para JavaScript, pois esta é uma f-string Python
     button_html = f"""
     <button 
         onclick="preencherCampo()" 
@@ -359,11 +373,9 @@ def criar_botao_preencher_coords(campo_nome):
         function preencherCampo() {{
             const coords = sessionStorage.getItem('gps_coords');
             if (coords) {{
-                // Encontrar o campo de input mais próximo
                 const inputs = document.querySelectorAll('input[type="text"]');
                 let targetInput = null;
                 
-                // Procurar pelo campo que contém "porteira" ou "sede" no placeholder
                 for (let input of inputs) {{
                     if (input.placeholder && input.placeholder.includes('Ex: -9.897')) {{
                         if ('{campo_nome}' === 'porteira' && input.placeholder.includes('porteira')) {{
@@ -399,6 +411,7 @@ def criar_botao_copiar(texto):
     # Escapar o texto fora da f-string
     texto_escapado = texto.replace('`', '\\`').replace('"', '\\"').replace("'", "\\'")
     
+    # Escapar chaves para JavaScript, pois esta é uma f-string Python
     button_html = f"""
     <div style="margin: 10px 0;">
         <button 
@@ -429,7 +442,6 @@ def criar_botao_copiar(texto):
                 alert('✅ Texto copiado para a área de transferência!');
             }}, function(err) {{
                 console.error('Erro ao copiar: ', err);
-                // Fallback para navegadores mais antigos
                 const textArea = document.createElement("textarea");
                 textArea.value = text;
                 document.body.appendChild(textArea);
@@ -484,7 +496,7 @@ def gerar_historico(dados):
     
     # Adicionar informação sobre rebanho apenas se houver marca de gado
     if dados['marca_gado']:
-        template += f" O rebanho possui marca/sinal/ferro registrado como \"{dados['marca_gado']}\"."
+        template += f" O rebanho possui marca/sinal/ferro registrado como \"{dados['marca_gado']}\"." # Aspas escapadas corretamente
     
     template += f""" A visita teve como objetivo central o cadastro e georreferenciamento da propriedade no sistema do Programa de Segurança Rural, o que foi efetivado. Consequentemente, foi afixada a placa de identificação do programa, de nº "{dados['numero_placa']}", entregue via mídia digital. Adicionalmente, foram repassadas ao proprietário orientações concernentes ao programa mencionado, a fim de sanar as dúvidas existentes. A presente visita cumpriu os objetivos estabelecidos pela referida Ordem de Serviço, sendo as informações coletadas e registradas com base nas declarações do proprietário e na verificação in loco."""
     
@@ -508,7 +520,7 @@ def main():
     # Sidebar com instruções
     with st.sidebar:
         st.header("📋 Instruções")
-        st.write("1. **📍 Localização**: Use o botão '🌍 Capturar Localização' para obter coordenadas GPS automaticamente")
+        st.write("1. **📍 Localização**: Use o botão '🎯 Alta Precisão' para obter coordenadas GPS automaticamente")
         st.write("2. Preencha todos os campos obrigatórios")
         st.write("3. Campos opcionais: veículos e marca de gado")
         st.write("4. Clique em 'Gerar Histórico'")
@@ -548,10 +560,11 @@ def main():
             obter_localizacao()
             
             lat_long_porteira = st.text_input("Coordenadas da porteira (Lat, Long)", placeholder="Ex: -9.897289, -63.017788")
-            criar_botao_preencher_coords("porteira")
+            # Exemplo de como o botão de preenchimento poderia ser usado, se desejado:
+            # criar_botao_preencher_coords("porteira") 
             
             lat_long_sede = st.text_input("Coordenadas da sede (Lat, Long)", placeholder="Ex: -9.897500, -63.017900")
-            criar_botao_preencher_coords("sede")
+            # criar_botao_preencher_coords("sede")
             
             st.header("📏 Área e Proprietário")
             area = st.number_input("Área da propriedade", min_value=0.0, step=0.1)
@@ -587,8 +600,8 @@ def main():
             numero_placa
         ]
         
-        if not all(campos_obrigatorios):
-            st.error("❌ Por favor, preencha todos os campos obrigatórios!")
+        if not all(campos_obrigatorios) or area <= 0: # Adicionada validação para área > 0
+            st.error("❌ Por favor, preencha todos os campos obrigatórios! A área deve ser maior que zero.")
         else:
             # Preparar dados
             dados = {
@@ -598,7 +611,7 @@ def main():
                 'tipo_propriedade': tipo_propriedade,
                 'nome_propriedade': nome_propriedade,
                 'endereco': endereco,
-                'municipio': municipio,
+                'municipio': municipio, # Indentação corrigida
                 'uf': uf,
                 'lat_long_porteira': lat_long_porteira,
                 'lat_long_sede': lat_long_sede,
@@ -612,39 +625,41 @@ def main():
                 'marca_gado': marca_gado,
                 'numero_placa': numero_placa
             }
-            
+           
             # Gerar histórico
             with st.spinner("🔄 Gerando histórico..."):
                 historico_bruto = gerar_historico(dados)
-            
+           
             # Refinar com OpenAI
             with st.spinner("✨ Refinando texto com IA..."):
                 historico_refinado = refinar_texto_com_openai(historico_bruto)
-            
+           
             # Exibir resultado
             st.success("✅ Histórico gerado com sucesso!")
-            
+           
             st.header("📄 Histórico Final")
-            
+           
             # Área de texto para visualização
-            st.text_area("Texto gerado:", value=historico_refinado, height=400, disabled=True)
-            
+            # Usando st.markdown para permitir melhor formatação e quebra de linhas do texto.
+            # Para visualização direta, st.text_area(disabled=True) é bom, mas markdown pode ser mais rico.
+            st.text_area("Texto gerado:", value=historico_refinado, height=400, key="historico_final_text_area", disabled=True)
+                       
             # Colunas para os botões
             col_copy, col_download = st.columns(2)
-            
+           
             with col_copy:
                 # Botão personalizado para copiar
                 criar_botao_copiar(historico_refinado)
-            
+           
             with col_download:
                 # Botão de download
                 st.download_button(
                     label="💾 Baixar como TXT",
                     data=historico_refinado,
-                    file_name=f"historico_policial_{data.strftime('%Y%m%d')}.txt",
+                    file_name=f"historico_policial_{data.strftime('%Y%m%d')}_{nome_propriedade.replace(' ','_')}.txt", # Nome de arquivo mais descritivo
                     mime="text/plain",
                     use_container_width=True
                 )
 
 if __name__ == "__main__":
-    main()
+   main()
