@@ -65,7 +65,7 @@ def obter_localizacao():
         <div id="status" style="margin-top: 15px; font-weight: bold; font-size: 14px;"></div>
         <div id="coordinates" style="margin-top: 15px; display: none;"></div>
         
-        </div>
+    </div>
 
     <script>
     let currentCoords = null;
@@ -84,7 +84,6 @@ def obter_localizacao():
             return;
         }
         
-        // Reset variáveis
         bestAccuracy = Infinity;
         attempts = 0;
         currentCoords = null;
@@ -93,7 +92,6 @@ def obter_localizacao():
         status.style.color = "#007bff";
         coordinates.style.display = "none";
         
-        // Usar watchPosition para múltiplas leituras
         watchId = navigator.geolocation.watchPosition(
             function(position) {
                 attempts++;
@@ -101,14 +99,15 @@ def obter_localizacao():
                 
                 status.innerHTML = `🔄 Tentativa ${attempts}/${maxAttempts} - Precisão: ±${Math.round(accuracy)}m`;
                 
-                // Aceitar se a precisão melhorou significativamente ou é boa o suficiente
                 if (accuracy < bestAccuracy && (accuracy < 10 || attempts >= maxAttempts)) {
                     bestAccuracy = accuracy;
                     processPosition(position, true);
-                    navigator.geolocation.clearWatch(watchId);
+                    if (watchId) navigator.geolocation.clearWatch(watchId); // Adicionado if para segurança
+                    watchId = null;
                 } else if (attempts >= maxAttempts) {
                     processPosition(position, true);
-                    navigator.geolocation.clearWatch(watchId);
+                    if (watchId) navigator.geolocation.clearWatch(watchId); // Adicionado if para segurança
+                    watchId = null;
                 }
             },
             handleLocationError,
@@ -119,14 +118,14 @@ def obter_localizacao():
             }
         );
         
-        // Timeout de segurança
         setTimeout(() => {
             if (watchId) {
                 navigator.geolocation.clearWatch(watchId);
-                if (currentCoords) {
-                    status.innerHTML = "⏰ Tempo limite. Usando melhor localização encontrada.";
+                watchId = null;
+                if (currentCoords) { // Se já processou uma posição antes do timeout
+                    status.innerHTML = `✅ Localização obtida! (Melhor esforço após timeout)`;
                 } else {
-                    status.innerHTML = "⏰ Tempo limite. Tente em área mais aberta.";
+                    status.innerHTML = "⏰ Tempo limite. Tente em área mais aberta ou use localização rápida.";
                     status.style.color = "#ff9800";
                 }
             }
@@ -151,9 +150,9 @@ def obter_localizacao():
             },
             handleLocationError,
             {
-                enableHighAccuracy: true,
-                timeout: 10000,
-                maximumAge: 30000
+                enableHighAccuracy: true, // Mantido true para melhor "rápida" possível
+                timeout: 15000, // Aumentado um pouco o timeout para rápida
+                maximumAge: 60000 // Aceitar posições armazenadas em cache por até 1 minuto
             }
         );
     }
@@ -194,7 +193,8 @@ def obter_localizacao():
             precisionColor = "#dc3545";
         }
         
-        status.innerHTML = `✅ Localização obtida! Precisão: ${precisionLevel}`;
+        // A mensagem de status agora inclui o nível de precisão.
+        status.innerHTML = `✅ Localização obtida! Nível: ${precisionLevel} (±${Math.round(accuracy)}m)`;
         status.style.color = precisionColor;
         
         coordinates.innerHTML = `
@@ -215,16 +215,6 @@ def obter_localizacao():
                         <div style="font-size: 12px; color: #666; margin-bottom: 5px;">📍 LONGITUDE</div>
                         <div style="font-family: 'Courier New', monospace; font-size: 16px; font-weight: bold; color: #333;">${lng.toFixed(8)}</div>
                     </div>
-                </div>
-                
-                <div style="margin-bottom: 20px;">
-                    <div style="font-size: 12px; color: #666; margin-bottom: 5px;">🎯 PRECISÃO</div>
-                    <div style="font-size: 16px; font-weight: bold; color: ${precisionColor};">±${Math.round(accuracy)} metros (${precisionLevel})</div>
-                </div>
-                
-                <div style="background: #f8f9fa; padding: 12px; border-radius: 8px; margin-bottom: 20px;">
-                    <div style="font-size: 12px; color: #666; margin-bottom: 5px;">📋 FORMATO PARA COPIAR</div>
-                    <div style="font-family: 'Courier New', monospace; font-size: 14px; font-weight: bold; color: #007bff; word-break: break-all;">${lat.toFixed(8)}, ${lng.toFixed(8)}</div>
                 </div>
                 
                 <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px;">
@@ -270,7 +260,7 @@ def obter_localizacao():
     
     function handleLocationError(error) {
         const status = document.getElementById("status");
-        const coordinates = document.getElementById("coordinates");
+        const coordinates = document.getElementById("coordinates"); // Certifique-se de que coordinates é manipulado
         
         let errorMsg = "";
         let suggestions = "";
@@ -289,39 +279,69 @@ def obter_localizacao():
                 suggestions = "💡 Tente localização rápida ou mova para área aberta.";
                 break;
             default:
-                errorMsg = "❌ Erro desconhecido.";
+                errorMsg = "❌ Erro desconhecido ao obter localização.";
                 suggestions = "💡 Recarregue a página e tente novamente.";
                 break;
         }
         
-        status.innerHTML = errorMsg + "<br><span style='font-size: 12px;'>" + suggestions + "</span>";
+        status.innerHTML = errorMsg + "<br><span style='font-size: 12px; color: #777;'>" + suggestions + "</span>";
         status.style.color = "#dc3545";
-        coordinates.style.display = "none";
+        if (coordinates) { // Adicionado para segurança
+            coordinates.style.display = "none";
+        }
     }
     
     function copyCoords() {
-        if (currentCoords) {
+        if (currentCoords && currentCoords.formatted) {
             navigator.clipboard.writeText(currentCoords.formatted).then(function() {
-                const button = event.target;
+                const button = event.target; // Assume event is available
                 const originalText = button.innerHTML;
                 button.innerHTML = "✅ Copiado!";
                 button.style.background = "linear-gradient(135deg, #17a2b8 0%, #138496 100%)";
                 
                 setTimeout(() => {
                     button.innerHTML = originalText;
-                    button.style.background = "linear-gradient(135deg, #28a745 0%, #20c997 100%)";
+                    button.style.background = "linear-gradient(135deg, #28a745 0%, #20c997 100%)"; // Restore original background
                 }, 2000);
                 
-            }).catch(function() {
-                prompt('Copie as coordenadas:', currentCoords.formatted);
+            }).catch(function(err) {
+                console.error('Erro ao copiar para clipboard: ', err);
+                // Fallback para prompt se a API de clipboard falhar (ex: em HTTP ou sem permissão)
+                prompt('Não foi possível copiar automaticamente. Copie manualmente:', currentCoords.formatted);
             });
+        } else {
+            // Informar ao usuário que não há coordenadas para copiar
+            const status = document.getElementById("status");
+            if(status) { // Adicionado para segurança
+                const originalStatusText = status.innerHTML;
+                const originalStatusColor = status.style.color;
+                status.innerHTML = "📋 Nenhuma coordenada para copiar. Obtenha a localização primeiro.";
+                status.style.color = "#ff9800"; // Laranja para aviso
+                setTimeout(() => {
+                    status.innerHTML = originalStatusText;
+                    status.style.color = originalStatusColor;
+                }, 3000);
+            }
         }
     }
     
     function openMaps() {
-        if (currentCoords) {
+        if (currentCoords && currentCoords.lat && currentCoords.lng) {
             const mapsUrl = `https://www.google.com/maps?q=${currentCoords.lat},${currentCoords.lng}`;
             window.open(mapsUrl, '_blank');
+        } else {
+            // Informar ao usuário que não há coordenadas para abrir no mapa
+             const status = document.getElementById("status");
+            if(status) { // Adicionado para segurança
+                const originalStatusText = status.innerHTML;
+                const originalStatusColor = status.style.color;
+                status.innerHTML = "🗺️ Nenhuma coordenada para ver no mapa. Obtenha a localização primeiro.";
+                status.style.color = "#ff9800"; // Laranja para aviso
+                setTimeout(() => {
+                    status.innerHTML = originalStatusText;
+                    status.style.color = originalStatusColor;
+                }, 3000);
+            }
         }
     }
     
@@ -330,25 +350,37 @@ def obter_localizacao():
             navigator.geolocation.clearWatch(watchId);
             watchId = null;
         }
-        document.getElementById("status").innerHTML = "";
-        document.getElementById("coordinates").style.display = "none";
+        const statusDiv = document.getElementById("status");
+        const coordinatesDiv = document.getElementById("coordinates");
+
+        if (statusDiv) statusDiv.innerHTML = "🗑️ Localização limpa.";
+        if (coordinatesDiv) coordinatesDiv.style.display = "none";
+        
         currentCoords = null;
         bestAccuracy = Infinity;
         attempts = 0;
+        
         sessionStorage.removeItem('gps_coords');
         sessionStorage.removeItem('gps_accuracy');
         sessionStorage.removeItem('gps_timestamp');
+
+        // Limpar a mensagem após um tempo
+        setTimeout(() => {
+            if (statusDiv && statusDiv.innerHTML === "🗑️ Localização limpa.") {
+                statusDiv.innerHTML = "";
+            }
+        }, 2000);
     }
     </script>
     """
     
-    components.html(html_code, height=350) # A altura pode precisar de ajuste dependendo do conteúdo final
+    components.html(html_code, height=320) # Ajustei a altura ligeiramente, pode precisar de mais testes
 
 def criar_botao_preencher_coords(campo_nome):
     """Criar botão para preencher coordenadas automaticamente"""
     button_html = f"""
     <button 
-        onclick="preencherCampo()" 
+        onclick="preencherCampo_{campo_nome}()" 
         style="
             background: linear-gradient(135deg, #4facfe 0%, #00f2fe 100%);
             color: white;
@@ -368,41 +400,71 @@ def criar_botao_preencher_coords(campo_nome):
     </button>
     
     <script>
-        function preencherCampo() {{
+        function preencherCampo_{campo_nome}() {{
             const coords = sessionStorage.getItem('gps_coords');
             if (coords) {{
-                const inputs = document.querySelectorAll('input[type="text"]');
+                // Lógica para encontrar o campo de input específico.
+                // Esta lógica pode precisar ser mais robusta dependendo da estrutura do seu app Streamlit.
+                // O seletor abaixo tenta encontrar um input com um placeholder específico.
+                // Se você tiver IDs ou classes mais confiáveis, use-os.
                 let targetInput = null;
-                
-                for (let input of inputs) {{
-                    if (input.placeholder && input.placeholder.includes('Ex: -9.897')) {{
-                        if ('{campo_nome}' === 'porteira' && input.placeholder.includes('porteira')) {{
-                            targetInput = input;
-                            break;
-                        }} else if ('{campo_nome}' === 'sede' && input.placeholder.includes('sede')) {{
-                            targetInput = input;
-                            break;
-                        }}
-                    }}
+                const inputs = Array.from(document.querySelectorAll('input[type="text"], textarea'));
+
+                // Tenta encontrar o input associado ao st.text_input ou st.text_area
+                // A heurística abaixo busca pelo input que visualmente está próximo ou
+                // tem um label correspondente ao campo_nome.
+                // Esta é uma parte difícil de generalizar sem IDs fixos.
+                // Uma abordagem mais simples, se os campos são sempre na mesma ordem:
+                // const porteiraInput = inputs.find(inp => inp.placeholder && inp.placeholder.includes("porteira"));
+                // const sedeInput = inputs.find(inp => inp.placeholder && inp.placeholder.includes("sede"));
+
+                let placeholderQuery = "";
+                if ('{campo_nome}' === 'porteira') {{
+                    placeholderQuery = "porteira";
+                }} else if ('{campo_nome}' === 'sede') {{
+                    placeholderQuery = "sede";
+                }}
+
+                // Tenta encontrar por placeholder se definido
+                if (placeholderQuery) {{
+                    targetInput = inputs.find(input => input.placeholder && input.placeholder.toLowerCase().includes(placeholderQuery));
+                }}
+
+                // Fallback se não encontrar por placeholder específico (pega o primeiro campo de coordenadas visível)
+                if (!targetInput) {{
+                     targetInput = inputs.find(input => input.placeholder && input.placeholder.toLowerCase().includes("lat, long") && input.offsetParent !== null);
                 }}
                 
                 if (targetInput) {{
                     targetInput.value = coords;
-                    targetInput.focus();
-                    targetInput.dispatchEvent(new Event('input', {{ bubbles: true }}));
-                    targetInput.dispatchEvent(new Event('change', {{ bubbles: true }}));
-                    alert('✅ Coordenadas preenchidas: ' + coords);
+                    // Simular input para Streamlit reconhecer a mudança
+                    const event = new Event('input', {{ bubbles: true }});
+                    targetInput.dispatchEvent(event);
+                    // Alguns apps Streamlit reagem melhor a 'change' ou precisam de um blur/focus
+                    const changeEvent = new Event('change', {{ bubbles: true }});
+                    targetInput.dispatchEvent(changeEvent);
+                    targetInput.focus(); // Para feedback visual
+                    
+                    // Feedback ao usuário
+                    const feedbackSpan = document.createElement('span');
+                    feedbackSpan.textContent = ' ✅ Preenchido!';
+                    feedbackSpan.style.color = 'green';
+                    feedbackSpan.style.fontSize = '12px';
+                    event.target.parentNode.insertBefore(feedbackSpan, event.target.nextSibling);
+                    setTimeout(() => feedbackSpan.remove(), 2000);
+
                 }} else {{
-                    alert('📋 Coordenadas disponíveis: ' + coords + '\\n\\nCole manualmente no campo acima.');
+                    alert('⚠️ Campo de destino não encontrado. Cole manualmente: ' + coords);
                 }}
             }} else {{
-                alert('❌ Nenhuma localização capturada. Use o botão "🌍 Capturar Localização" primeiro.');
+                alert('❌ Nenhuma localização capturada. Use o widget de localização primeiro.');
             }}
         }}
     </script>
     """
     
-    components.html(button_html, height=50)
+    components.html(button_html, height=55)
+
 
 def criar_botao_copiar(texto):
     """Criar botão customizado para copiar texto"""
@@ -411,7 +473,8 @@ def criar_botao_copiar(texto):
     button_html = f"""
     <div style="margin: 10px 0;">
         <button 
-            onclick="copyToClipboard()" 
+            id="customCopyButton"
+            onclick="copyToClipboard_{texto_escapado[:10].replace(' ','_')}()" 
             style="
                 background: linear-gradient(135deg, #ff6b6b 0%, #ee5a24 100%);
                 color: white;
@@ -432,30 +495,66 @@ def criar_botao_copiar(texto):
     </div>
     
     <script>
-        function copyToClipboard() {{
-            const text = `{texto_escapado}`;
-            navigator.clipboard.writeText(text).then(function() {{
-                alert('✅ Texto copiado para a área de transferência!');
-            }}, function(err) {{
-                console.error('Erro ao copiar: ', err);
-                const textArea = document.createElement("textarea");
-                textArea.value = text;
-                document.body.appendChild(textArea);
-                textArea.focus();
-                textArea.select();
-                try {{
-                    document.execCommand('copy');
-                    alert('✅ Texto copiado para a área de transferência!');
-                }} catch (err) {{
-                    alert('❌ Erro ao copiar texto');
+        function copyToClipboard_{texto_escapado[:10].replace(' ','_')}() {{
+            const textToCopy = `{texto_escapado}`;
+            const button = document.getElementById("customCopyButton");
+            const originalButtonText = button.innerHTML;
+
+            if (navigator.clipboard && navigator.clipboard.writeText) {{
+                navigator.clipboard.writeText(textToCopy).then(function() {{
+                    button.innerHTML = '✅ Texto Copiado!';
+                    button.style.background = 'linear-gradient(135deg, #28a745 0%, #20c997 100%)'; // Verde sucesso
+                    setTimeout(function() {{
+                        button.innerHTML = originalButtonText;
+                        button.style.background = 'linear-gradient(135deg, #ff6b6b 0%, #ee5a24 100%)'; // Restaura cor original
+                    }}, 2000);
+                }}, function(err) {{
+                    console.error('Erro ao copiar para clipboard: ', err);
+                    // Fallback para método execCommand
+                    fallbackCopyTextToClipboard(textToCopy, button, originalButtonText);
+                }});
+            }} else {{
+                // Fallback para navegadores sem navigator.clipboard
+                fallbackCopyTextToClipboard(textToCopy, button, originalButtonText);
+            }}
+        }}
+
+        function fallbackCopyTextToClipboard(text, button, originalButtonText) {{
+            const textArea = document.createElement("textarea");
+            textArea.value = text;
+            textArea.style.position = "fixed";  // Prevenir scroll
+            textArea.style.top = "-9999px";    // Mover para fora da tela
+            textArea.style.left = "-9999px";
+            document.body.appendChild(textArea);
+            textArea.focus();
+            textArea.select();
+            try {{
+                const successful = document.execCommand('copy');
+                if (successful) {{
+                    button.innerHTML = '✅ Texto Copiado! (fallback)';
+                    button.style.background = 'linear-gradient(135deg, #28a745 0%, #20c997 100%)';
+                }} else {{
+                    button.innerHTML = '❌ Falha ao Copiar (fallback)';
+                    button.style.background = 'linear-gradient(135deg, #dc3545 0%, #c82333 100%)'; // Vermelho erro
+                    prompt("Falha ao copiar. Por favor, copie manualmente:", text);
                 }}
-                document.body.removeChild(textArea);
-            }});
+            }} catch (err) {{
+                console.error('Erro no fallback execCommand: ', err);
+                button.innerHTML = '❌ Falha Crítica ao Copiar';
+                button.style.background = 'linear-gradient(135deg, #dc3545 0%, #c82333 100%)';
+                prompt("Falha crítica ao copiar. Por favor, copie manualmente:", text);
+            }}
+            document.body.removeChild(textArea);
+            setTimeout(function() {{
+                button.innerHTML = originalButtonText;
+                button.style.background = 'linear-gradient(135deg, #ff6b6b 0%, #ee5a24 100%)';
+            }}, 3000);
         }}
     </script>
     """
     
     components.html(button_html, height=80)
+
 
 def refinar_texto_com_openai(texto):
     """Função para refinar o texto usando OpenAI GPT"""
@@ -519,8 +618,6 @@ def main():
         st.write("6. Use o botão '📋 Copiar Texto Completo' ou '💾 Baixar como TXT'.")
         
         st.header("🔧 Dicas de Precisão GPS")
-        # st.write("🎯 **Alta Precisão**: Aguarda múltiplas leituras GPS (1-5 metros)") # Removido conforme solicitado, mas pode ser útil manter aqui se o espaço não for problema
-        # st.write("⚡ **Rápida**: Primeira leitura disponível (pode ser menos precisa)") # Removido
         st.write("📱 **No celular**: Permita acesso à localização quando solicitado pelo navegador.")
         st.write("🌍 **GPS**: Funciona melhor ao ar livre com visão clara do céu.")
         st.write("⏰ **Paciência**: A 'Alta Precisão' pode levar até 60 segundos.")
@@ -547,11 +644,16 @@ def main():
             st.header("📍 Coordenadas GPS")
             obter_localizacao()
             
-            lat_long_porteira = st.text_input("Coordenadas da porteira (Lat, Long)", placeholder="Ex: -9.897289, -63.017788")
-            lat_long_sede = st.text_input("Coordenadas da sede (Lat, Long)", placeholder="Ex: -9.897500, -63.017900")
+            lat_long_porteira = st.text_input("Coordenadas da porteira (Lat, Long)", key="lat_long_porteira_input", placeholder="Ex: -9.897289, -63.017788")
+            # Se quiser o botão de preenchimento:
+            # criar_botao_preencher_coords("porteira") 
+            
+            lat_long_sede = st.text_input("Coordenadas da sede (Lat, Long)", key="lat_long_sede_input", placeholder="Ex: -9.897500, -63.017900")
+            # Se quiser o botão de preenchimento:
+            # criar_botao_preencher_coords("sede")
             
             st.header("📏 Área e Proprietário")
-            area = st.number_input("Área da propriedade", min_value=0.01, step=0.1, format="%.2f") # Min value 0.01
+            area = st.number_input("Área da propriedade", min_value=0.01, step=0.1, format="%.2f")
             unidade_area = st.selectbox("Unidade", ["hectares", "alqueires"])
             nome_proprietario = st.text_input("Nome do proprietário")
             cpf_cnpj = st.text_input("CPF/CNPJ", placeholder="000.000.000-00 ou 00.000.000/0000-00")
@@ -583,7 +685,7 @@ def main():
             "Município": municipio,
             "Coordenadas da porteira": lat_long_porteira,
             "Coordenadas da sede": lat_long_sede,
-            "Área da propriedade": area,
+            "Área da propriedade": area, # A validação de > 0 é feita abaixo
             "Nome do proprietário": nome_proprietario,
             "CPF/CNPJ": cpf_cnpj,
             "Telefone": telefone,
@@ -591,11 +693,13 @@ def main():
             "Número da placa": numero_placa
         }
         
-        campos_vazios = [nome for nome, valor in campos_obrigatorios.items() if not valor]
-        
+        campos_vazios = [nome for nome, valor in campos_obrigatorios.items() if not valor and nome != "Área da propriedade"] # area é validada separadamente
+        if not campos_obrigatorios["Área da propriedade"]: # Adiciona área se estiver vazia (None)
+             campos_vazios.append("Área da propriedade")
+
         if campos_vazios:
             st.error(f"❌ Por favor, preencha todos os campos obrigatórios: {', '.join(campos_vazios)}!")
-        elif area <= 0:
+        elif area <= 0: # area é um float aqui
              st.error("❌ A área da propriedade deve ser maior que zero.")
         else:
             dados = {
@@ -609,7 +713,7 @@ def main():
                 'uf': uf,
                 'lat_long_porteira': lat_long_porteira,
                 'lat_long_sede': lat_long_sede,
-                'area': f"{area:.2f}", # Formatar área com 2 casas decimais
+                'area': f"{area:.2f}", 
                 'unidade_area': unidade_area,
                 'nome_proprietario': nome_proprietario,
                 'cpf_cnpj': cpf_cnpj,
@@ -629,7 +733,7 @@ def main():
             st.success("✅ Histórico gerado com sucesso!")
            
             st.header("📄 Histórico Final")
-            st.text_area("Texto gerado:", value=historico_refinado, height=400, key="historico_final_text_area", disabled=True)
+            st.text_area("Texto gerado:", value=historico_refinado, height=400, key="historico_final_text_area_display", disabled=True) # Chave única
                        
             col_copy, col_download = st.columns(2)
            
@@ -640,7 +744,7 @@ def main():
                 st.download_button(
                     label="💾 Baixar como TXT",
                     data=historico_refinado,
-                    file_name=f"historico_policial_{data.strftime('%Y%m%d')}_{nome_propriedade.replace(' ','_')}.txt",
+                    file_name=f"historico_policial_{data.strftime('%Y%m%d')}_{nome_propriedade.replace(' ','_') if nome_propriedade else 'desconhecido'}.txt",
                     mime="text/plain",
                     use_container_width=True
                 )
