@@ -1,6 +1,6 @@
 import streamlit as st
 from openai import OpenAI
-from datetime import datetime 
+from datetime import datetime
 import streamlit.components.v1 as components
 
 # Configurar cliente OpenAI usando secrets do Streamlit
@@ -312,28 +312,28 @@ def obter_localizacao():
         const copyButton = document.getElementById("gpsCopyCoordsButton");
         
         let originalButtonText = "📋 Copiar Coordenadas";
-        let originalButtonStyleBackground = "linear-gradient(135deg, #28a745 0%, #20c997 100%)"; 
+        let originalButtonStyleBackground = "linear-gradient(135deg, #28a745 0%, #20c997 100%)"; // Estilo padrão do botão
 
         if (copyButton) {
             originalButtonText = copyButton.innerHTML;
-            originalButtonStyleBackground = copyButton.style.background || originalButtonStyleBackground;
+            originalButtonStyleBackground = copyButton.style.background;
         }
 
         function showSuccessFeedback() {
             if (copyButton) {
                 copyButton.innerHTML = "✅ Copiado!";
-                copyButton.style.background = "linear-gradient(135deg, #17a2b8 0%, #138496 100%)"; 
+                copyButton.style.background = "linear-gradient(135deg, #17a2b8 0%, #138496 100%)"; // Azul para feedback de sucesso
                 setTimeout(() => {
                     copyButton.innerHTML = originalButtonText;
                     copyButton.style.background = originalButtonStyleBackground;
                 }, 2000);
-            } else { 
+            } else {
                 const statusDiv = document.getElementById("status");
                 if (statusDiv) {
                     const prevStatus = statusDiv.innerHTML;
                     const prevColor = statusDiv.style.color;
                     statusDiv.innerHTML = "✅ Coordenadas copiadas!";
-                    statusDiv.style.color = "#17a2b8"; 
+                    statusDiv.style.color = "#17a2b8"; // Azul feedback
                     setTimeout(() => {
                         statusDiv.innerHTML = prevStatus;
                         statusDiv.style.color = prevColor;
@@ -345,7 +345,7 @@ def obter_localizacao():
         function showFailureFeedback(usePrompt = true) {
             if (copyButton) {
                 copyButton.innerHTML = "❌ Falha ao copiar";
-                copyButton.style.background = "linear-gradient(135deg, #dc3545 0%, #c82333 100%)"; 
+                copyButton.style.background = "linear-gradient(135deg, #dc3545 0%, #c82333 100%)"; // Vermelho para erro
                 setTimeout(() => {
                     copyButton.innerHTML = originalButtonText;
                     copyButton.style.background = originalButtonStyleBackground;
@@ -358,10 +358,10 @@ def obter_localizacao():
 
         if (navigator.clipboard && navigator.clipboard.writeText) {
             navigator.clipboard.writeText(textToCopy).then(
-                () => { 
+                () => { // Success
                     showSuccessFeedback();
                 },
-                (err) => { 
+                (err) => { // Failure for navigator.clipboard.writeText
                     console.warn('navigator.clipboard.writeText falhou, tentando fallback execCommand: ', err);
                     fallbackCopy();
                 }
@@ -386,11 +386,11 @@ def obter_localizacao():
                     showSuccessFeedback();
                 } else {
                     console.error('Fallback execCommand falhou em copiar.');
-                    showFailureFeedback(true); 
+                    showFailureFeedback(true); // Mostra prompt
                 }
             } catch (err) {
                 console.error('Erro crítico no fallback execCommand: ', err);
-                showFailureFeedback(true); 
+                showFailureFeedback(true); // Mostra prompt
             }
             document.body.removeChild(textArea);
         }
@@ -479,10 +479,15 @@ def criar_botao_preencher_coords(campo_nome):
                     let currentElement = currentButton;
                     let searchContainer = null;
 
-                    for (let i = 0; i < 5; i++) {{ 
+                    // Tentar encontrar o container do st.text_input mais próximo
+                    // Normalmente, Streamlit envolve os widgets em divs com data-testid
+                    for (let i = 0; i < 5; i++) {{ // Procurar até 5 níveis acima
                         if (!currentElement) break;
                         const parent = currentElement.parentElement;
                         if (parent && parent.querySelector('input[type="text"], textarea')) {{
+                             // Tentativa de encontrar um container que englobe tanto o botão quanto o input
+                             // Se o botão estiver em uma coluna e o input em outra, essa lógica pode falhar.
+                             // A heurística abaixo é para quando o botão está relativamente próximo ao input.
                             const testIdDiv = parent.closest('div[data-testid="stVerticalBlock"]');
                             if (testIdDiv) {{
                                 searchContainer = testIdDiv;
@@ -492,20 +497,24 @@ def criar_botao_preencher_coords(campo_nome):
                         currentElement = parent;
                     }}
                     
+                    // Se não encontrou um container específico, busca em todo o documento (menos ideal)
                     const inputsToSearch = searchContainer ? 
                                            Array.from(searchContainer.querySelectorAll('input[type="text"], textarea')) :
                                            Array.from(document.querySelectorAll('input[type="text"], textarea'));
 
                     for (let input of inputsToSearch) {{
-                        if (input.placeholder && input.placeholder.toLowerCase().includes("{campo_nome.lower()}")) {{
+                        if (input.placeholder && input.placeholder.toLowerCase().includes("{campo_nome.toLowerCase()}")) {{
                             targetInput = input;
                             break;
                         }}
                     }}
                     
-                    if (!targetInput) {{ 
+                    // Fallback se o placeholder específico não for encontrado, tentar um placeholder genérico
+                    if (!targetInput) {{
                         for (let input of inputsToSearch) {{
-                           if (input.placeholder && input.placeholder.toLowerCase().includes("ex: -9.897")) {{
+                           if (input.placeholder && input.placeholder.includes("Ex: -9.897")) {{
+                               // Para diferenciar entre "porteira" e "sede", precisaria de mais contexto ou IDs.
+                               // Se só houver um campo de coordenadas perto, pode funcionar.
                                targetInput = input; 
                                break; 
                            }}
@@ -525,6 +534,7 @@ def criar_botao_preencher_coords(campo_nome):
                         feedbackSpan.style.color = 'green';
                         feedbackSpan.style.fontSize = '10px';
                         feedbackSpan.style.marginLeft = '5px';
+                        // Adiciona o feedback próximo ao botão
                         if(currentButton && currentButton.parentNode) {{
                            currentButton.parentNode.insertBefore(feedbackSpan, currentButton.nextSibling);
                         }}
@@ -546,7 +556,7 @@ def criar_botao_preencher_coords(campo_nome):
 
 def criar_botao_copiar(texto):
     texto_escapado = texto.replace('`', '\\`').replace('"', '\\"').replace("'", "\\'")
-    unique_id_suffix = ''.join(filter(str.isalnum, texto_escapado[:20])) 
+    unique_id_suffix = ''.join(filter(str.isalnum, texto_escapado[:20])) # Gera ID mais seguro
 
     button_html = f"""
     <div style="margin: 10px 0;">
@@ -582,7 +592,7 @@ def criar_botao_copiar(texto):
 
             function showSuccessOnButton() {{
                 button.innerHTML = '✅ Texto Copiado!';
-                button.style.background = 'linear-gradient(135deg, #28a745 0%, #20c997 100%)'; 
+                button.style.background = 'linear-gradient(135deg, #28a745 0%, #20c997 100%)'; // Verde sucesso
                 setTimeout(function() {{
                     button.innerHTML = originalButtonText;
                     button.style.background = originalButtonStyleBackground;
@@ -591,7 +601,7 @@ def criar_botao_copiar(texto):
 
             function showFailureOnButton(usePrompt = true) {{
                 button.innerHTML = '❌ Falha ao Copiar';
-                button.style.background = 'linear-gradient(135deg, #dc3545 0%, #c82333 100%)'; 
+                button.style.background = 'linear-gradient(135deg, #dc3545 0%, #c82333 100%)'; // Vermelho erro
                 setTimeout(function() {{
                     button.innerHTML = originalButtonText;
                     button.style.background = originalButtonStyleBackground;
@@ -604,12 +614,12 @@ def criar_botao_copiar(texto):
             if (navigator.clipboard && navigator.clipboard.writeText) {{
                 navigator.clipboard.writeText(textToCopy).then(
                     showSuccessOnButton,
-                    function(err) {{ 
+                    function(err) {{ // Falha do navigator.clipboard
                         console.warn('navigator.clipboard.writeText falhou, tentando fallback: ', err);
                         fallbackCopyToClipboardInternal();
                     }}
                 );
-            }} else {{ 
+            }} else {{ // navigator.clipboard não disponível
                 console.warn('navigator.clipboard não disponível, usando fallback.');
                 fallbackCopyToClipboardInternal();
             }}
@@ -711,9 +721,9 @@ def main():
         
         with col1:
             st.header("📅 Dados da Visita")
-            data_visita = st.date_input("Data da visita", key="data_visita_input")
-            # Ajustado o step para 60 segundos (1 minuto)
-            hora_inicio = st.time_input("Hora de início", key="hora_inicio_visita", step=60) 
+            data = st.date_input("Data da visita", key="data_visita")
+            hora_inicio = st.time_input("Hora de início", key="hora_inicio_visita")
+            hora_fim = st.time_input("Hora de término", key="hora_fim_visita")
             
             st.header("🏠 Dados da Propriedade")
             tipo_propriedade = st.selectbox("Tipo de propriedade", ["Sítio", "Fazenda", "Chácara", "Estância"], key="tipo_prop_sel")
@@ -727,7 +737,10 @@ def main():
             obter_localizacao()
             
             lat_long_porteira = st.text_input("Coordenadas da porteira (Lat, Long)", key="lat_long_porteira_input", placeholder="Ex: -9.897289, -63.017788")
+            # criar_botao_preencher_coords("porteira") 
+            
             lat_long_sede = st.text_input("Coordenadas da sede (Lat, Long)", key="lat_long_sede_input", placeholder="Ex: -9.897500, -63.017900")
+            # criar_botao_preencher_coords("sede")
             
             st.header("📏 Área e Proprietário")
             area = st.number_input("Área da propriedade", min_value=0.01, step=0.1, format="%.2f", key="area_num_input")
@@ -754,14 +767,15 @@ def main():
     
     if submitted:
         campos_obrigatorios = {
-            "Data da visita": data_visita,
+            "Data da visita": data,
             "Hora de início": hora_inicio,
+            "Hora de término": hora_fim,
             "Nome da propriedade": nome_propriedade,
             "Endereço completo": endereco,
             "Município": municipio,
             "Coordenadas da porteira": lat_long_porteira,
             "Coordenadas da sede": lat_long_sede,
-            "Área da propriedade": area, 
+            "Área da propriedade": area,
             "Nome do proprietário": nome_proprietario,
             "CPF/CNPJ": cpf_cnpj,
             "Telefone": telefone,
@@ -778,12 +792,10 @@ def main():
         elif area <= 0: 
              st.error("❌ A área da propriedade deve ser maior que zero.")
         else:
-            hora_fim_atual = datetime.now().strftime("%H:%M")
-
             dados = {
-                'data': data_visita.strftime("%d/%m/%Y"),
+                'data': data.strftime("%d/%m/%Y"),
                 'hora_inicio': hora_inicio.strftime("%H:%M"),
-                'hora_fim': hora_fim_atual, 
+                'hora_fim': hora_fim.strftime("%H:%M"),
                 'tipo_propriedade': tipo_propriedade,
                 'nome_propriedade': nome_propriedade,
                 'endereco': endereco,
@@ -822,7 +834,7 @@ def main():
                 st.download_button(
                     label="💾 Baixar como TXT",
                     data=historico_refinado,
-                    file_name=f"historico_policial_{data_visita.strftime('%Y%m%d')}_{nome_propriedade.replace(' ','_') if nome_propriedade else 'desconhecido'}.txt",
+                    file_name=f"historico_policial_{data.strftime('%Y%m%d')}_{nome_propriedade.replace(' ','_') if nome_propriedade else 'desconhecido'}.txt",
                     mime="text/plain",
                     use_container_width=True
                 )
