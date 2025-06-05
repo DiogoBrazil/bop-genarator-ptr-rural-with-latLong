@@ -217,7 +217,7 @@ def obter_localizacao():
                 </div>
                 
                 <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px;">
-                    <button onclick="copyCoords()" style="
+                    <button id="gpsCopyCoordsButton" onclick="copyCoords()" style="
                         background: linear-gradient(135deg, #28a745 0%, #20c997 100%);
                         color: white;
                         border: none;
@@ -291,34 +291,108 @@ def obter_localizacao():
     }
     
     function copyCoords() {
-        if (currentCoords && currentCoords.formatted) {
-            navigator.clipboard.writeText(currentCoords.formatted).then(function() {
-                const button = event.target; 
-                const originalText = button.innerHTML;
-                button.innerHTML = "✅ Copiado!";
-                button.style.background = "linear-gradient(135deg, #17a2b8 0%, #138496 100%)";
-                
-                setTimeout(() => {
-                    button.innerHTML = originalText;
-                    button.style.background = "linear-gradient(135deg, #28a745 0%, #20c997 100%)"; 
-                }, 2000);
-                
-            }).catch(function(err) {
-                console.error('Erro ao copiar para clipboard: ', err);
-                prompt('Não foi possível copiar automaticamente. Copie manualmente:', currentCoords.formatted);
-            });
-        } else {
+        if (!currentCoords || !currentCoords.formatted) {
             const status = document.getElementById("status");
-            if(status) { 
+            if (status) {
                 const originalStatusText = status.innerHTML;
                 const originalStatusColor = status.style.color;
                 status.innerHTML = "📋 Nenhuma coordenada para copiar. Obtenha a localização primeiro.";
-                status.style.color = "#ff9800"; 
+                status.style.color = "#ff9800";
                 setTimeout(() => {
-                    status.innerHTML = originalStatusText;
-                    status.style.color = originalStatusColor;
+                    if (status.innerHTML === "📋 Nenhuma coordenada para copiar. Obtenha a localização primeiro.") {
+                        status.innerHTML = originalStatusText;
+                        status.style.color = originalStatusColor;
+                    }
                 }, 3000);
             }
+            return;
+        }
+
+        const textToCopy = currentCoords.formatted;
+        const copyButton = document.getElementById("gpsCopyCoordsButton");
+        
+        let originalButtonText = "📋 Copiar Coordenadas";
+        let originalButtonStyleBackground = "linear-gradient(135deg, #28a745 0%, #20c997 100%)"; // Estilo padrão do botão
+
+        if (copyButton) {
+            originalButtonText = copyButton.innerHTML;
+            originalButtonStyleBackground = copyButton.style.background;
+        }
+
+        function showSuccessFeedback() {
+            if (copyButton) {
+                copyButton.innerHTML = "✅ Copiado!";
+                copyButton.style.background = "linear-gradient(135deg, #17a2b8 0%, #138496 100%)"; // Azul para feedback de sucesso
+                setTimeout(() => {
+                    copyButton.innerHTML = originalButtonText;
+                    copyButton.style.background = originalButtonStyleBackground;
+                }, 2000);
+            } else {
+                const statusDiv = document.getElementById("status");
+                if (statusDiv) {
+                    const prevStatus = statusDiv.innerHTML;
+                    const prevColor = statusDiv.style.color;
+                    statusDiv.innerHTML = "✅ Coordenadas copiadas!";
+                    statusDiv.style.color = "#17a2b8"; // Azul feedback
+                    setTimeout(() => {
+                        statusDiv.innerHTML = prevStatus;
+                        statusDiv.style.color = prevColor;
+                    }, 2000);
+                }
+            }
+        }
+
+        function showFailureFeedback(usePrompt = true) {
+            if (copyButton) {
+                copyButton.innerHTML = "❌ Falha ao copiar";
+                copyButton.style.background = "linear-gradient(135deg, #dc3545 0%, #c82333 100%)"; // Vermelho para erro
+                setTimeout(() => {
+                    copyButton.innerHTML = originalButtonText;
+                    copyButton.style.background = originalButtonStyleBackground;
+                }, 3000);
+            }
+            if (usePrompt) {
+                prompt('Não foi possível copiar automaticamente. Copie manualmente:', textToCopy);
+            }
+        }
+
+        if (navigator.clipboard && navigator.clipboard.writeText) {
+            navigator.clipboard.writeText(textToCopy).then(
+                () => { // Success
+                    showSuccessFeedback();
+                },
+                (err) => { // Failure for navigator.clipboard.writeText
+                    console.warn('navigator.clipboard.writeText falhou, tentando fallback execCommand: ', err);
+                    fallbackCopy();
+                }
+            );
+        } else {
+            console.warn('navigator.clipboard não disponível, usando fallback execCommand.');
+            fallbackCopy();
+        }
+
+        function fallbackCopy() {
+            const textArea = document.createElement("textarea");
+            textArea.value = textToCopy;
+            textArea.style.position = "fixed"; 
+            textArea.style.top = "-9999px";
+            textArea.style.left = "-9999px";
+            document.body.appendChild(textArea);
+            textArea.focus();
+            textArea.select();
+            try {
+                const successful = document.execCommand('copy');
+                if (successful) {
+                    showSuccessFeedback();
+                } else {
+                    console.error('Fallback execCommand falhou em copiar.');
+                    showFailureFeedback(true); // Mostra prompt
+                }
+            } catch (err) {
+                console.error('Erro crítico no fallback execCommand: ', err);
+                showFailureFeedback(true); // Mostra prompt
+            }
+            document.body.removeChild(textArea);
         }
     }
     
@@ -369,12 +443,9 @@ def obter_localizacao():
     </script>
     """
     
-    # Aumentada a altura do componente para acomodar melhor o conteúdo expandido
     components.html(html_code, height=450) 
 
 def criar_botao_preencher_coords(campo_nome):
-    """Criar botão para preencher coordenadas automaticamente"""
-    # Adicionado identificador único para a função JavaScript para evitar conflitos se usado múltiplas vezes
     func_name = f"preencherCampo_{campo_nome.replace('-', '_').replace(' ', '_')}"
     button_html = f"""
     <button 
@@ -398,49 +469,57 @@ def criar_botao_preencher_coords(campo_nome):
     </button>
     
     <script>
-        if (typeof {func_name} !== 'function') {{ // Evitar redeclaração da função
+        if (typeof {func_name} !== 'function') {{ 
             function {func_name}() {{
                 const coords = sessionStorage.getItem('gps_coords');
-                const currentButton = document.currentScript.previousElementSibling; // Pega o botão que chamou
+                const currentButton = document.currentScript.previousElementSibling; 
 
                 if (coords) {{
                     let targetInput = null;
-                    // Tenta encontrar o input de texto imediatamente antes deste script/botão no DOM do Streamlit
-                    // Esta é uma heurística e pode precisar de ajuste dependendo da estrutura exata do Streamlit
-                    let sibling = currentButton.closest('div[data-testid="stVerticalBlock"]'); // Tenta subir para um container de bloco
-                    if (sibling) {{
-                         const inputs = sibling.querySelectorAll('input[type="text"], textarea');
-                         // Pega o último input text ANTES do container do botão, se o botão estiver numa coluna separada
-                         // Ou o input que está "associado" ao campo_nome
-                         // Para simplificar, vamos assumir que o st.text_input está logo acima visualmente
-                         // ou que o placeholder é uma boa pista
-                        for (let i = 0; i < inputs.length; i++) {{
-                            if (inputs[i].placeholder && inputs[i].placeholder.toLowerCase().includes("{campo_nome}")) {{
-                                targetInput = inputs[i];
+                    let currentElement = currentButton;
+                    let searchContainer = null;
+
+                    // Tentar encontrar o container do st.text_input mais próximo
+                    // Normalmente, Streamlit envolve os widgets em divs com data-testid
+                    for (let i = 0; i < 5; i++) {{ // Procurar até 5 níveis acima
+                        if (!currentElement) break;
+                        const parent = currentElement.parentElement;
+                        if (parent && parent.querySelector('input[type="text"], textarea')) {{
+                             // Tentativa de encontrar um container que englobe tanto o botão quanto o input
+                             // Se o botão estiver em uma coluna e o input em outra, essa lógica pode falhar.
+                             // A heurística abaixo é para quando o botão está relativamente próximo ao input.
+                            const testIdDiv = parent.closest('div[data-testid="stVerticalBlock"]');
+                            if (testIdDiv) {{
+                                searchContainer = testIdDiv;
                                 break;
                             }}
                         }}
-                        if (!targetInput && inputs.length > 0) {{ // Fallback: pega o último antes do botão
-                             // Essa lógica de encontrar o targetInput é complexa no Streamlit sem IDs explícitos
-                             // para os inputs gerados. A abordagem com placeholder é mais confiável.
+                        currentElement = parent;
+                    }}
+                    
+                    // Se não encontrou um container específico, busca em todo o documento (menos ideal)
+                    const inputsToSearch = searchContainer ? 
+                                           Array.from(searchContainer.querySelectorAll('input[type="text"], textarea')) :
+                                           Array.from(document.querySelectorAll('input[type="text"], textarea'));
+
+                    for (let input of inputsToSearch) {{
+                        if (input.placeholder && input.placeholder.toLowerCase().includes("{campo_nome.toLowerCase()}")) {{
+                            targetInput = input;
+                            break;
                         }}
                     }}
                     
-                    // Se a busca por placeholder não for suficiente, pode-se tentar uma busca mais genérica pelo placeholder "Lat, Long"
+                    // Fallback se o placeholder específico não for encontrado, tentar um placeholder genérico
                     if (!targetInput) {{
-                        const allTextInputs = Array.from(document.querySelectorAll('input[type="text"], textarea'));
-                        for (let input of allTextInputs) {{
-                            if (input.placeholder && input.placeholder.toLowerCase().includes("{campo_nome}")) {{
-                                targetInput = input;
-                                break;
-                            }}
-                             // Se o campo_nome não for encontrado no placeholder, e for um campo genérico de coordenadas
-                            if (!targetInput && input.placeholder && input.placeholder.includes("Ex: -9.897")) {{
-                                targetInput = input; // Poderia ser este? Perigoso se houver múltiplos.
-                            }}
+                        for (let input of inputsToSearch) {{
+                           if (input.placeholder && input.placeholder.includes("Ex: -9.897")) {{
+                               // Para diferenciar entre "porteira" e "sede", precisaria de mais contexto ou IDs.
+                               // Se só houver um campo de coordenadas perto, pode funcionar.
+                               targetInput = input; 
+                               break; 
+                           }}
                         }}
                     }}
-
 
                     if (targetInput) {{
                         targetInput.value = coords;
@@ -455,7 +534,10 @@ def criar_botao_preencher_coords(campo_nome):
                         feedbackSpan.style.color = 'green';
                         feedbackSpan.style.fontSize = '10px';
                         feedbackSpan.style.marginLeft = '5px';
-                        currentButton.parentNode.insertBefore(feedbackSpan, currentButton.nextSibling);
+                        // Adiciona o feedback próximo ao botão
+                        if(currentButton && currentButton.parentNode) {{
+                           currentButton.parentNode.insertBefore(feedbackSpan, currentButton.nextSibling);
+                        }}
                         setTimeout(() => feedbackSpan.remove(), 2500);
 
                     }} else {{
@@ -473,11 +555,9 @@ def criar_botao_preencher_coords(campo_nome):
 
 
 def criar_botao_copiar(texto):
-    """Criar botão customizado para copiar texto"""
     texto_escapado = texto.replace('`', '\\`').replace('"', '\\"').replace("'", "\\'")
-    # Usar um ID único para o botão e nome de função para evitar conflitos
-    unique_id_suffix = texto_escapado[:15].replace('`', '').replace('"', '').replace("'", "").replace(' ', '_').replace('.', '').replace(',', '')
-    
+    unique_id_suffix = ''.join(filter(str.isalnum, texto_escapado[:20])) # Gera ID mais seguro
+
     button_html = f"""
     <div style="margin: 10px 0;">
         <button 
@@ -508,54 +588,65 @@ def criar_botao_copiar(texto):
             const textToCopy = `{texto_escapado}`;
             const button = document.getElementById("customCopyButton_{unique_id_suffix}");
             const originalButtonText = button.innerHTML;
+            const originalButtonStyleBackground = button.style.background;
+
+            function showSuccessOnButton() {{
+                button.innerHTML = '✅ Texto Copiado!';
+                button.style.background = 'linear-gradient(135deg, #28a745 0%, #20c997 100%)'; // Verde sucesso
+                setTimeout(function() {{
+                    button.innerHTML = originalButtonText;
+                    button.style.background = originalButtonStyleBackground;
+                }}, 2000);
+            }}
+
+            function showFailureOnButton(usePrompt = true) {{
+                button.innerHTML = '❌ Falha ao Copiar';
+                button.style.background = 'linear-gradient(135deg, #dc3545 0%, #c82333 100%)'; // Vermelho erro
+                setTimeout(function() {{
+                    button.innerHTML = originalButtonText;
+                    button.style.background = originalButtonStyleBackground;
+                }}, 3000);
+                if (usePrompt) {{
+                    prompt("Falha ao copiar. Por favor, copie manualmente:", textToCopy);
+                }}
+            }}
 
             if (navigator.clipboard && navigator.clipboard.writeText) {{
-                navigator.clipboard.writeText(textToCopy).then(function() {{
-                    button.innerHTML = '✅ Texto Copiado!';
-                    button.style.background = 'linear-gradient(135deg, #28a745 0%, #20c997 100%)';
-                    setTimeout(function() {{
-                        button.innerHTML = originalButtonText;
-                        button.style.background = 'linear-gradient(135deg, #ff6b6b 0%, #ee5a24 100%)';
-                    }}, 2000);
-                }}, function(err) {{
-                    console.error('Erro ao copiar para clipboard: ', err);
-                    fallbackCopyTextToClipboard_{unique_id_suffix}(textToCopy, button, originalButtonText);
-                }});
-            }} else {{
-                fallbackCopyTextToClipboard_{unique_id_suffix}(textToCopy, button, originalButtonText);
+                navigator.clipboard.writeText(textToCopy).then(
+                    showSuccessOnButton,
+                    function(err) {{ // Falha do navigator.clipboard
+                        console.warn('navigator.clipboard.writeText falhou, tentando fallback: ', err);
+                        fallbackCopyToClipboardInternal();
+                    }}
+                );
+            }} else {{ // navigator.clipboard não disponível
+                console.warn('navigator.clipboard não disponível, usando fallback.');
+                fallbackCopyToClipboardInternal();
             }}
-        }}
 
-        function fallbackCopyTextToClipboard_{unique_id_suffix}(text, button, originalButtonText) {{
-            const textArea = document.createElement("textarea");
-            textArea.value = text;
-            textArea.style.position = "fixed";
-            textArea.style.top = "-9999px";
-            textArea.style.left = "-9999px";
-            document.body.appendChild(textArea);
-            textArea.focus();
-            textArea.select();
-            try {{
-                const successful = document.execCommand('copy');
-                if (successful) {{
-                    button.innerHTML = '✅ Texto Copiado!'; // Removido (fallback) para simplicidade
-                    button.style.background = 'linear-gradient(135deg, #28a745 0%, #20c997 100%)';
-                }} else {{
-                    button.innerHTML = '❌ Falha ao Copiar';
-                    button.style.background = 'linear-gradient(135deg, #dc3545 0%, #c82333 100%)';
-                    prompt("Falha ao copiar. Por favor, copie manualmente:", text);
+            function fallbackCopyToClipboardInternal() {{
+                const textArea = document.createElement("textarea");
+                textArea.value = textToCopy;
+                textArea.style.position = "fixed";  
+                textArea.style.top = "-9999px";    
+                textArea.style.left = "-9999px";
+                document.body.appendChild(textArea);
+                textArea.focus();
+                textArea.select();
+                try {{
+                    const successful = document.execCommand('copy');
+                    if (successful) {{
+                        showSuccessOnButton();
+                    }} else {{
+                        console.error('Fallback execCommand falhou em copiar.');
+                        showFailureOnButton(true);
+                    }}
+                }} catch (err) {{
+                    console.error('Erro crítico no fallback execCommand: ', err);
+                    showFailureOnButton(true);
                 }}
-            }} catch (err) {{
-                console.error('Erro no fallback execCommand: ', err);
-                button.innerHTML = '❌ Falha Crítica'; // Simplificado
-                button.style.background = 'linear-gradient(135deg, #dc3545 0%, #c82333 100%)';
-                prompt("Falha crítica ao copiar. Por favor, copie manualmente:", text);
+                document.body.removeChild(textArea);
             }}
-            document.body.removeChild(textArea);
-            setTimeout(function() {{
-                button.innerHTML = originalButtonText;
-                button.style.background = 'linear-gradient(135deg, #ff6b6b 0%, #ee5a24 100%)';
-            }}, 3000);
         }}
     }}
     </script>
@@ -565,7 +656,6 @@ def criar_botao_copiar(texto):
 
 
 def refinar_texto_com_openai(texto):
-    """Função para refinar o texto usando OpenAI GPT"""
     try:
         response = client.chat.completions.create(
             model="gpt-4o-mini",
@@ -588,18 +678,12 @@ def refinar_texto_com_openai(texto):
         return texto
 
 def gerar_historico(dados):
-    """Função para gerar o histórico baseado no template"""
-    
     template = f"""Em atendimento à Ordem de Serviço, vinculada ao Programa de Segurança Rural no Vale do Jamari, foi realizada uma visita técnica em {dados['data']}, com início às {dados['hora_inicio']} e término às {dados['hora_fim']}. A diligência ocorreu na propriedade rural denominada {dados['tipo_propriedade']} "{dados['nome_propriedade']}", situada em {dados['endereco']}, na Zona Rural do município de {dados['municipio']}/{dados['uf']}. Procedeu-se ao levantamento das coordenadas geográficas, sendo a porteira de acesso principal localizada em {dados['lat_long_porteira']}, e a sede/residência principal em {dados['lat_long_sede']}. A área total da propriedade compreende {dados['area']} {dados['unidade_area']}. O proprietário, Sr. "{dados['nome_proprietario']}", inscrito no CPF/CNPJ sob o nº "{dados['cpf_cnpj']}", com contato telefônico principal "{dados['telefone']}", esteve presente durante a visita. A principal atividade econômica desenvolvida no local é "{dados['atividade_principal']}"."""
-    
     if dados['veiculos']:
         template += f" Foram identificados os seguintes veículos automotores na propriedade: {dados['veiculos']}."
-    
     if dados['marca_gado']:
         template += f" O rebanho possui marca/sinal/ferro registrado como \"{dados['marca_gado']}\"."
-    
     template += f""" A visita teve como objetivo central o cadastro e georreferenciamento da propriedade no sistema do Programa de Segurança Rural, o que foi efetivado. Consequentemente, foi afixada a placa de identificação do programa, de nº "{dados['numero_placa']}", entregue via mídia digital. Adicionalmente, foram repassadas ao proprietário orientações concernentes ao programa mencionado, a fim de sanar as dúvidas existentes. A presente visita cumpriu os objetivos estabelecidos pela referida Ordem de Serviço, sendo as informações coletadas e registradas com base nas declarações do proprietário e na verificação in loco."""
-    
     return template
 
 def main():
@@ -650,7 +734,7 @@ def main():
             
         with col2:
             st.header("📍 Coordenadas GPS")
-            obter_localizacao() # A altura deste componente foi aumentada
+            obter_localizacao()
             
             lat_long_porteira = st.text_input("Coordenadas da porteira (Lat, Long)", key="lat_long_porteira_input", placeholder="Ex: -9.897289, -63.017788")
             # criar_botao_preencher_coords("porteira") 
