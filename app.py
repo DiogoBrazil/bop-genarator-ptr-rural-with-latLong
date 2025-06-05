@@ -1,127 +1,64 @@
 import streamlit as st
 from openai import OpenAI
 from datetime import datetime
-# import re # Not needed if using strptime for validation
 import streamlit.components.v1 as components
+import re
 
 # Configurar cliente OpenAI usando secrets do Streamlit
 client = OpenAI(api_key=st.secrets["OPENAI_API_KEY"])
 
 def validar_formato_hora_strptime(hora_str: str) -> bool:
     """Valida se a string da hora está no formato HH:MM e se os valores são válidos."""
-    if not isinstance(hora_str, str) or len(hora_str) != 5:
+    if not isinstance(hora_str, str):
         return False
-    try:
-        datetime.strptime(hora_str, "%H:%M")
-        return True
-    except ValueError:
-        return False
-
-def masked_time_input(label: str, key: str) -> str:
-    """
-    Cria um campo de input de texto com máscara para HH:MM usando HTML/JS.
-    O valor é retornado para o Python via Streamlit.setComponentValue.
-    The 'key' parameter is used for st.session_state and to generate unique HTML IDs.
-    """
-    input_id = f"masked_time_input_{key}"
-    initial_html_value = st.session_state.get(key, "")
-
-    html_component = f"""
-    <label for="{input_id}" style="display: block; margin-bottom: 5px; font-size: 14px; color: #31333F;">{label}</label>
-    <input type="text" id="{input_id}" value="{initial_html_value}" maxlength="5" placeholder="HH:MM"
-           style="width: 70px; padding: 8px; border: 1px solid #ccc; border-radius: 4px; font-size: 14px;">
-    <script>
-    (function() {{ // IIFE para escopo
-        const input = document.getElementById('{input_id}');
-        
-        function formatAndSetValue(element) {{
-            let value = element.value;
-            let originalCursorPos = element.selectionStart;
-
-            let digits = value.replace(/[^0-9]/g, "");
-            digits = digits.substring(0, 4);
-            
-            let formattedValue = "";
-
-            if (digits.length > 0) {{
-                let hh_str = digits.substring(0, 2);
-                if (hh_str.length === 2) {{
-                    let hh_num = parseInt(hh_str, 10);
-                    if (hh_num > 23) {{
-                        hh_str = "23"; 
-                        digits = hh_str + digits.substring(2); 
-                    }}
-                }}
-                formattedValue = hh_str;
-            }}
-            
-            if (digits.length > 2) {{
-                let mm_str = digits.substring(2, 4);
-                 if (mm_str.length === 2) {{
-                    let mm_num = parseInt(mm_str, 10);
-                    if (mm_num > 59) {{
-                        mm_str = "59";
-                    }}
-                }}
-                formattedValue += ":" + mm_str;
-            }}
-            
-            element.value = formattedValue;
-
-            // Lógica de cursor (simplificada)
-            if (originalCursorPos === 2 && value.length === 2 && formattedValue.length === 3 && formattedValue.charAt(2) === ':') {{
-                 element.setSelectionRange(3, 3);
-            }} else if (originalCursorPos === 3 && value.length === 3 && formattedValue.length === 2 && value.charAt(2) === ':'){{
-                 element.setSelectionRange(2,2);
-            }} else {{
-                if (formattedValue.length === 5 || originalCursorPos > formattedValue.length) {{
-                    element.setSelectionRange(formattedValue.length, formattedValue.length);
-                }} else {{
-                    element.setSelectionRange(originalCursorPos, originalCursorPos);
-                }}
-            }}
-
-            if (window.Streamlit) {{
-                window.Streamlit.setComponentValue(formattedValue);
-            }}
-        }}
-
-        input.addEventListener('input', function(event) {{
-            if (event.isComposing) {{
-                return;
-            }}
-            formatAndSetValue(this);
-        }});
-
-        let initSent = false;
-        const sendInitialValue = () => {{
-            // Verifica se Streamlit e setComponentValue estão disponíveis
-            if(window.Streamlit && typeof window.Streamlit.setComponentValue === 'function' && !initSent) {{
-                formatAndSetValue(input); 
-                initSent = true;
-            }} else if (!initSent) {{ // Se não estiver pronto, tenta novamente
-                setTimeout(sendInitialValue, 100); 
-            }}
-        }};
-        
-        // Tenta enviar o valor inicial. Adiciona listener se Streamlit não estiver pronto.
-        if (window.Streamlit && typeof window.Streamlit.setComponentValue === 'function') {{
-            sendInitialValue();
-        }} else {{
-            window.addEventListener('streamlit:component_ready', sendInitialValue, {{ once: true }});
-            setTimeout(sendInitialValue, 200); // Fallback de tempo
-        }}
-    }})();
-    </script>
-    """
-    # Removido o argumento 'key' da chamada components.html
-    component_value = components.html(html_component, height=75) 
     
-    if component_value is not None:
-        st.session_state[key] = component_value
-        return component_value
-    return st.session_state.get(key, "")
+    # Remove espaços em branco
+    hora_str = hora_str.strip()
+    
+    # Verifica se está vazio
+    if not hora_str:
+        return False
+    
+    # Verifica formato básico com regex
+    if not re.match(r'^\d{1,2}:\d{2}$', hora_str):
+        return False
+    
+    try:
+        # Tenta fazer o parse
+        # strptime("%H:%M") espera horas como "00"-"23" e minutos "00"-"59".
+        # Se a regex permitir "H:MM", strptime falhará para horas de um dígito sem zero à esquerda.
+        # No entanto, o placeholder e a ajuda sugerem "HH:MM", então o comportamento atual está ok.
+        time_obj = datetime.strptime(hora_str, "%H:%M")
+        
+        # Validação adicional dos valores (pode ser redundante se strptime for bem-sucedido, mas não prejudica)
+        parts = hora_str.split(':')
+        if len(parts) != 2: # Já coberto pelo regex e strptime, mas para segurança.
+            return False
+            
+        hour = int(parts[0])
+        minute = int(parts[1])
+        
+        # Verifica se hora e minuto estão em ranges válidos
+        if hour < 0 or hour > 23:
+            return False
+        if minute < 0 or minute > 59:
+            return False
+            
+        return True
+    except (ValueError, IndexError):
+        return False
 
+def time_input_native(label: str, key: str) -> str:
+    """Input de hora usando apenas Streamlit nativo"""
+    value = st.text_input(
+        label, 
+        key=key,
+        placeholder="HH:MM (ex: 12:45)",
+        help="Digite no formato HH:MM. Exemplos: 08:30, 14:25, 09:15"
+    )
+    return value.strip() if value else ""
+
+# [Todas as outras funções permanecem iguais - obter_localizacao, criar_botao_copiar, etc.]
 
 def obter_localizacao():
     """Função para obter localização em tempo real com alta precisão"""
@@ -139,8 +76,8 @@ def obter_localizacao():
                 cursor: pointer;
                 font-size: 14px;
                 box-shadow: 0 4px 15px 0 rgba(31, 38, 135, 0.37);
-                flex: 1 1 auto; /* Responsividade */
-                min-width: 180px; /* Largura mínima */
+                flex: 1 1 auto;
+                min-width: 180px;
                 text-align: center;
             " onmouseover="this.style.transform='scale(1.05)'" onmouseout="this.style.transform='scale(1)'">
                 🎯 Localização de Alta Precisão
@@ -155,8 +92,8 @@ def obter_localizacao():
                 cursor: pointer;
                 font-size: 14px;
                 box-shadow: 0 4px 15px 0 rgba(76, 175, 80, 0.37);
-                flex: 1 1 auto; /* Responsividade */
-                min-width: 180px; /* Largura mínima */
+                flex: 1 1 auto;
+                min-width: 180px;
                 text-align: center;
             " onmouseover="this.style.transform='scale(1.05)'" onmouseout="this.style.transform='scale(1)'">
                 ⚡ Localização Rápida
@@ -171,8 +108,8 @@ def obter_localizacao():
                 cursor: pointer;
                 font-size: 14px;
                 box-shadow: 0 4px 15px 0 rgba(245, 87, 108, 0.37);
-                flex: 1 1 auto; /* Responsividade */
-                min-width: 120px; /* Largura mínima para botão menor */
+                flex: 1 1 auto;
+                min-width: 120px;
                 text-align: center;
             " onmouseover="this.style.transform='scale(1.05)'" onmouseout="this.style.transform='scale(1)'">
                 🗑️ Limpar
@@ -515,7 +452,8 @@ def obter_localizacao():
     
     function openMaps() {
         if (currentCoords && currentCoords.lat && currentCoords.lng) {
-            const mapsUrl = `https://www.google.com/maps?q=${currentCoords.lat},${currentCoords.lng}`;
+            // CORRIGIDO: Usar template literals do JavaScript e URL válida do Google Maps
+            const mapsUrl = `https://maps.google.com/?q=${currentCoords.lat},${currentCoords.lng}`;
             window.open(mapsUrl, '_blank');
         } else {
              const status = document.getElementById("status");
@@ -525,8 +463,10 @@ def obter_localizacao():
                 status.innerHTML = "🗺️ Nenhuma coordenada para ver no mapa. Obtenha a localização primeiro.";
                 status.style.color = "#ff9800"; 
                 setTimeout(() => {
-                    status.innerHTML = originalStatusText;
-                    status.style.color = originalStatusColor;
+                    if (status.innerHTML === "🗺️ Nenhuma coordenada para ver no mapa. Obtenha a localização primeiro.") {
+                        status.innerHTML = originalStatusText;
+                        status.style.color = originalStatusColor;
+                    }
                 }, 3000);
             }
         }
@@ -561,81 +501,6 @@ def obter_localizacao():
     """
     
     components.html(html_code, height=450) 
-
-def criar_botao_preencher_coords(campo_nome):
-    # Esta função não está sendo chamada no main, mas mantida caso seja útil no futuro.
-    func_name = f"preencherCampo_{campo_nome.replace('-', '_').replace(' ', '_')}"
-    button_html = f"""
-    <button 
-        onclick="{func_name}()" 
-        style="
-            background: linear-gradient(135deg, #4facfe 0%, #00f2fe 100%);
-            color: white;
-            border: none;
-            padding: 8px 15px;
-            border-radius: 5px;
-            cursor: pointer;
-            font-size: 12px;
-            margin-top: 5px;
-            width: 100%;
-            box-shadow: 0 2px 10px rgba(79, 172, 254, 0.3);
-        "
-        onmouseover="this.style.transform='scale(1.02)'"
-        onmouseout="this.style.transform='scale(1)'"
-    >
-        📍 Usar Localização Capturada
-    </button>
-    
-    <script>
-        if (typeof {func_name} !== 'function') {{ 
-            function {func_name}() {{
-                const coords = sessionStorage.getItem('gps_coords');
-                const currentButton = document.currentScript.previousElementSibling; 
-
-                if (coords) {{
-                    let targetInput = null;
-                    const inputs = Array.from(document.querySelectorAll('input[type="text"], textarea'));
-                    for (let input of inputs) {{
-                        if (input.placeholder && input.placeholder.toLowerCase().includes("{campo_nome.lower()}")) {{
-                            targetInput = input;
-                            break;
-                        }}
-                        if (!targetInput && input.placeholder && input.placeholder.toLowerCase().includes("ex: -9.897")) {{
-                            targetInput = input;
-                        }}
-                    }}
-
-                    if (targetInput) {{
-                        targetInput.value = coords;
-                        const inputEvent = new Event('input', {{ bubbles: true }});
-                        targetInput.dispatchEvent(inputEvent);
-                        const changeEvent = new Event('change', {{ bubbles: true }});
-                        targetInput.dispatchEvent(changeEvent);
-                        targetInput.focus();
-                        
-                        const feedbackSpan = document.createElement('span');
-                        feedbackSpan.textContent = ' ✅ Preenchido!';
-                        feedbackSpan.style.color = 'green';
-                        feedbackSpan.style.fontSize = '10px';
-                        feedbackSpan.style.marginLeft = '5px';
-                        if(currentButton && currentButton.parentNode) {{
-                           currentButton.parentNode.insertBefore(feedbackSpan, currentButton.nextSibling);
-                        }}
-                        setTimeout(() => feedbackSpan.remove(), 2500);
-
-                    }} else {{
-                        alert('⚠️ Campo de texto para "' + '{campo_nome}' + '" não encontrado. Cole manualmente: ' + coords);
-                    }}
-                }} else {{
-                    alert('❌ Nenhuma localização capturada. Use o widget de localização primeiro.');
-                }}
-            }}
-        }}
-    </script>
-    """
-    
-    components.html(button_html, height=55)
-
 
 def criar_botao_copiar(texto):
     texto_escapado = texto.replace('`', '\\`').replace('"', '\\"').replace("'", "\\'")
@@ -737,11 +602,10 @@ def criar_botao_copiar(texto):
     
     components.html(button_html, height=80)
 
-
 def refinar_texto_com_openai(texto):
     try:
         response = client.chat.completions.create(
-            model="gpt-4o-mini",
+            model="gpt-4o-mini", # ou outro modelo que preferir
             messages=[
                 {
                     "role": "system",
@@ -752,15 +616,16 @@ def refinar_texto_com_openai(texto):
                     "content": f"Por favor, corrija este relatório policial mantendo todas as informações originais, apenas melhorando a gramática, coesão e coerência:\n\n{texto}"
                 }
             ],
-            max_tokens=2000,
+            max_tokens=2000, # Ajuste conforme necessário
             temperature=0.3
         )
         return response.choices[0].message.content
     except Exception as e:
         st.error(f"Erro ao conectar com OpenAI: {str(e)}")
-        return texto
+        return texto # Retorna o texto original em caso de erro
 
 def gerar_historico(dados):
+    # Template permanece o mesmo
     template = f"""Em atendimento à Ordem de Serviço, vinculada ao Programa de Segurança Rural no Vale do Jamari, foi realizada uma visita técnica em {dados['data']}, com início às {dados['hora_inicio']} e término às {dados['hora_fim']}. A diligência ocorreu na propriedade rural denominada {dados['tipo_propriedade']} "{dados['nome_propriedade']}", situada em {dados['endereco']}, na Zona Rural do município de {dados['municipio']}/{dados['uf']}. Procedeu-se ao levantamento das coordenadas geográficas, sendo a porteira de acesso principal localizada em {dados['lat_long_porteira']}, e a sede/residência principal em {dados['lat_long_sede']}. A área total da propriedade compreende {dados['area']} {dados['unidade_area']}. O proprietário, Sr. "{dados['nome_proprietario']}", inscrito no CPF/CNPJ sob o nº "{dados['cpf_cnpj']}", com contato telefônico principal "{dados['telefone']}", esteve presente durante a visita. A principal atividade econômica desenvolvida no local é "{dados['atividade_principal']}"."""
     if dados['veiculos']:
         template += f" Foram identificados os seguintes veículos automotores na propriedade: {dados['veiculos']}."
@@ -799,6 +664,8 @@ def main():
         st.write("⏰ **Paciência**: A 'Alta Precisão' pode levar até 60 segundos.")
         st.write("📍 **Posição**: Mantenha o dispositivo relativamente parado durante a captura para melhor precisão.")
         st.write("🔒 **HTTPS**: A geolocalização do navegador geralmente requer conexão segura (HTTPS).")
+        
+        debug_mode = st.checkbox("🐛 Modo Debug", key="debug_mode_checkbox")
     
     with st.form("formulario_historico"):
         col1, col2 = st.columns(2)
@@ -807,11 +674,12 @@ def main():
             st.header("📅 Dados da Visita")
             data_visita = st.date_input("Data da visita", key="data_visita_input")
             
-            # Usando os novos componentes de input de hora mascarados
-            # As chaves "comp_hora_inicio" e "comp_hora_fim" são usadas internamente pelo componente
-            # e para st.session_state.
-            hora_inicio_str = masked_time_input("Hora de início", key="comp_hora_inicio")
-            hora_fim_str = masked_time_input("Hora de término", key="comp_hora_fim")
+            hora_inicio_str = time_input_native("Hora de início", key="comp_hora_inicio")
+            hora_fim_str = time_input_native("Hora de término", key="comp_hora_fim")
+            
+            if debug_mode: # Debug inicial dos valores capturados do input nativo
+                st.write(f"🐛 Debug Input - Hora início (raw): '{hora_inicio_str}'")
+                st.write(f"🐛 Debug Input - Hora fim (raw): '{hora_fim_str}'")
             
             st.header("🏠 Dados da Propriedade")
             tipo_propriedade = st.selectbox("Tipo de propriedade", ["Sítio", "Fazenda", "Chácara", "Estância"], key="tipo_prop_sel")
@@ -822,7 +690,7 @@ def main():
             
         with col2:
             st.header("📍 Coordenadas GPS")
-            obter_localizacao()
+            obter_localizacao() # Componente HTML para GPS
             
             lat_long_porteira = st.text_input("Coordenadas da porteira (Lat, Long)", key="lat_long_porteira_input", placeholder="Ex: -9.897289, -63.017788")
             lat_long_sede = st.text_input("Coordenadas da sede (Lat, Long)", key="lat_long_sede_input", placeholder="Ex: -9.897500, -63.017900")
@@ -848,14 +716,29 @@ def main():
         st.header("🏷️ Placa de Identificação")
         numero_placa = st.text_input("Número da placa", placeholder="Ex: PSR-001", key="numero_placa_text")
         
-        # Este é o botão de submit do formulário Streamlit
         submitted = st.form_submit_button("🚀 Gerar Histórico", use_container_width=True)
     
     if submitted:
-        # Recupera os valores dos componentes mascarados usando as mesmas chaves
-        # Eles já devem estar atualizados em st.session_state pela lógica do componente
-        hora_inicio_val_final = st.session_state.get("comp_hora_inicio", "")
-        hora_fim_val_final = st.session_state.get("comp_hora_fim", "")
+        hora_inicio_val_final = hora_inicio_str # Já é .strip() pela função time_input_native
+        hora_fim_val_final = hora_fim_str       # Já é .strip() pela função time_input_native
+
+        if debug_mode:
+            st.write("### 🐛 Debug Detalhado (Após Submit, Antes da Validação)")
+            st.write(f"Hora início (para validação): '{hora_inicio_val_final}', Tipo: {type(hora_inicio_val_final)}, Len: {len(hora_inicio_val_final if hora_inicio_val_final else '')}")
+            st.write(f"Hora fim (para validação): '{hora_fim_val_final}', Tipo: {type(hora_fim_val_final)}, Len: {len(hora_fim_val_final if hora_fim_val_final else '')}")
+            
+            # Teste regex individual corrigido
+            if hora_inicio_val_final:
+                match_inicio_debug = re.match(r'^\d{1,2}:\d{2}$', hora_inicio_val_final)
+                st.write(f"🐛 Debug Regex match início ('{hora_inicio_val_final}'): {match_inicio_debug is not None}")
+            else:
+                st.write(f"🐛 Debug Regex match início: String vazia, não testado.")
+            
+            if hora_fim_val_final:
+                match_fim_debug = re.match(r'^\d{1,2}:\d{2}$', hora_fim_val_final)
+                st.write(f"🐛 Debug Regex match fim ('{hora_fim_val_final}'): {match_fim_debug is not None}")
+            else:
+                st.write(f"🐛 Debug Regex match fim: String vazia, não testado.")
 
         campos_obrigatorios_dict = {
             "Data da visita": data_visita,
@@ -876,31 +759,38 @@ def main():
         
         campos_vazios_nomes = []
         for nome, valor in campos_obrigatorios_dict.items():
-            if isinstance(valor, str) and not valor.strip(): # Para strings como hora_inicio_str, nome_propriedade, etc.
+            if isinstance(valor, str) and not valor.strip(): # Checa strings vazias ou só com espaços
                 campos_vazios_nomes.append(nome)
-            elif valor is None and nome not in ["Veículos", "Marca/sinal/ferro registrado"]: # Campos que podem ser None
-                 if nome == "Área da propriedade" and (area is None or area <=0) : # area é float, não pode ser None e deve ser >0
+            elif valor is None: # Checa None para campos não-string (como data_visita, area)
+                 if nome == "Área da propriedade" and (area is None or area <=0) : 
                      if nome not in campos_vazios_nomes: campos_vazios_nomes.append(nome + " (deve ser > 0)")
-                 elif nome != "Área da propriedade": # Para outros campos None que são obrigatórios
+                 elif nome != "Área da propriedade": 
                      campos_vazios_nomes.append(nome)
         
-        # Verificação específica para área, caso não tenha sido pega acima
-        if area is None or area <= 0:
-            if "Área da propriedade" not in [c.split(" (")[0] for c in campos_vazios_nomes]:
+        if area is None or area <= 0: # Garantir que a área seja validada mesmo se não for None, mas <=0
+            if "Área da propriedade (deve ser > 0)" not in campos_vazios_nomes and \
+               "Área da propriedade" not in campos_vazios_nomes :
                  campos_vazios_nomes.append("Área da propriedade (deve ser > 0)")
 
-
         erros_formato_hora = []
-        if hora_inicio_val_final and not validar_formato_hora_strptime(hora_inicio_val_final):
+        if not hora_inicio_val_final: # Adicionado para checar se o campo obrigatório de hora está vazio
+            if "Hora de início" not in campos_vazios_nomes: campos_vazios_nomes.append("Hora de início")
+        elif not validar_formato_hora_strptime(hora_inicio_val_final):
             erros_formato_hora.append("Hora de início")
-        if hora_fim_val_final and not validar_formato_hora_strptime(hora_fim_val_final):
+        
+        if not hora_fim_val_final: # Adicionado para checar se o campo obrigatório de hora está vazio
+            if "Hora de término" not in campos_vazios_nomes: campos_vazios_nomes.append("Hora de término")
+        elif not validar_formato_hora_strptime(hora_fim_val_final):
             erros_formato_hora.append("Hora de término")
 
         if campos_vazios_nomes:
+            # Remover duplicatas e ordenar para mensagem de erro clara
             unique_campos_vazios = sorted(list(set(campos_vazios_nomes)))
             st.error(f"❌ Por favor, preencha todos os campos obrigatórios: {', '.join(unique_campos_vazios)}!")
         elif erros_formato_hora:
             st.error(f"❌ Formato de hora inválido para: {', '.join(erros_formato_hora)}. Use o formato HH:MM e valores válidos (ex: 08:30).")
+            if debug_mode:
+                st.error(f"🐛 Debug Valores Hora para Validação - Início: '{hora_inicio_val_final}', Fim: '{hora_fim_val_final}'")
         else:
             dados = {
                 'data': data_visita.strftime("%d/%m/%Y"),
@@ -919,8 +809,8 @@ def main():
                 'cpf_cnpj': cpf_cnpj,
                 'telefone': telefone,
                 'atividade_principal': atividade_principal,
-                'veiculos': veiculos,
-                'marca_gado': marca_gado,
+                'veiculos': veiculos if veiculos.strip() else "", # Garante que não passe só espaços
+                'marca_gado': marca_gado if marca_gado.strip() else "", # Garante que não passe só espaços
                 'numero_placa': numero_placa
             }
            
@@ -950,4 +840,4 @@ def main():
                 )
 
 if __name__ == "__main__":
-   main()
+    main()
